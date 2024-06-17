@@ -131,13 +131,13 @@ def chat_window(analyst):
     if speech_input:
         #Displaying the user question in the chat message
         with st.chat_message("user"):
-            st.markdown(speech_input)
+            st.markdown(user_question)
         #Adding user question to chat history
-        st.session_state.messages.append({"role":"user","question":speech_input})
+        st.session_state.messages.append({"role":"user","question":user_question})
        
         try:
             with st.spinner("Analyzing..."):
-                response = analyst.chat(speech_input)
+                response = analyst.chat(user_question)
                 st.write(response)
                 st.session_state.messages.append({"role":"assistant","response":response})
         
