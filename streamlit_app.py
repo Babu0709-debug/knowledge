@@ -116,7 +116,7 @@ def chat_window(analyst):
             # Retrieving error messages
             elif 'error' in message:
                 st.text(message['error'])
-    
+
     # WebRTC for speech-to-text
     webrtc_ctx = webrtc_streamer(
         key="speech-to-text",
@@ -148,6 +148,19 @@ def chat_window(analyst):
                 user_question = recognize_speech(audio_content)
                 st.write(f"Recognized Speech: {user_question}")
 
+                # Add recognized speech to message history
+                st.session_state.messages.append({"role": "user", "question": user_question})
+
+                try:
+                    with st.spinner("Analyzing..."):
+                        response = analyst.chat(user_question)
+                        st.write(response)
+                        st.session_state.messages.append({"role": "assistant", "response": response})
+                except Exception as e:
+                    st.write(e)
+                    error_message = "⚠️Sorry, Couldn't generate the answer! Please try rephrasing your question!"
+                    st.session_state.messages.append({"role": "assistant", "error": error_message})
+
     # Getting the questions from the users
     user_question = st.chat_input("What are you curious about? ")
 
@@ -166,6 +179,7 @@ def chat_window(analyst):
         except Exception as e:
             st.write(e)
             error_message = "⚠️Sorry, Couldn't generate the answer! Please try rephrasing your question!"
+            st.session_state.messages.append({"role": "assistant", "error": error_message})
 
     # Function to clear history
     def clear_chat_history():
