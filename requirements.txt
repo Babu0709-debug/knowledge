@@ -19,7 +19,6 @@ google-generativeai
 seaborn
 pyyaml
 matplotlib
-pyaudio==0.2.11
 Flask
 werkzeug
 requests
