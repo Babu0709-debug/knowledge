@@ -14,4 +14,4 @@ python-dotenv
 streamlit-webrtc
 SpeechRecognition
 pydub==0.25.1
-streamlit_mic_recorder 
+streamlit_mic_recorder
