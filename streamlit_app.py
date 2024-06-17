@@ -3,8 +3,6 @@ import pandas as pd
 from langchain_google_genai import ChatGoogleGenerativeAI
 import google.generativeai as genai
 from dotenv import load_dotenv
-from pandasai import SmartDataframe
-from pandasai import SmartDatalake
 from pandasai.llm import BambooLLM
 from pandasai import Agent
 from pandasai.responses.streamlit_response import StreamlitResponse
@@ -12,7 +10,6 @@ import os
 import speech_recognition as sr
 from streamlit_webrtc import webrtc_streamer, WebRtcMode, ClientSettings
 from pydub import AudioSegment
-import numpy as np
 import av
 import io
 
@@ -167,7 +164,7 @@ def chat_window(analyst):
                 st.session_state.messages.append({"role": "assistant", "error": error_message})
 
     # Getting the questions from the users
-    user_question = st.chat_input("What are you curious about? ")
+    user_question = st.text_input("What are you curious about? ")
 
     if user_question:
         # Displaying the user question in the chat message
