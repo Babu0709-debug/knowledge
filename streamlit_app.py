@@ -124,8 +124,8 @@ def chat_window(analyst):
     #Getting the questions from the users
     
     speech_input = st.write(speech_to_text(language='en'))
-    #user_question = st.chat_input("What are you curious about? ")
-    user_question = speech_input
+    user_question = st.chat_input("What are you curious about? ",speech_input)
+    #user_question = speech_input
 
     
     if speech_input:
