@@ -12,7 +12,8 @@ import os
 import speech_recognition as sr
 from streamlit_webrtc import webrtc_streamer, WebRtcMode, ClientSettings
 from pydub import AudioSegment
-from pydub.playback import play
+import numpy as np
+import av
 import io
 
 # Load environment variables
@@ -31,6 +32,26 @@ def recognize_speech(audio_data):
         return "Could not understand audio"
     except sr.RequestError:
         return "Error in the request to speech recognition service"
+
+# WebRTC callback function for audio frames
+def audio_callback(frame: av.AudioFrame):
+    audio = frame.to_ndarray()
+    audio_segment = AudioSegment(
+        data=audio.tobytes(),
+        sample_width=audio.dtype.itemsize,
+        frame_rate=frame.sample_rate,
+        channels=len(audio.shape),
+    )
+
+    audio_wav = io.BytesIO()
+    audio_segment.export(audio_wav, format="wav")
+    audio_wav.seek(0)
+    audio_data = sr.AudioFile(audio_wav)
+    recognizer = sr.Recognizer()
+    with audio_data as source:
+        audio_content = recognizer.record(source)
+        text = recognize_speech(audio_content)
+        st.session_state.recognized_text = text
 
 def main():
     st.set_page_config(page_title="PandasAI", page_icon="🐼")
@@ -124,42 +145,26 @@ def chat_window(analyst):
         client_settings=ClientSettings(
             media_stream_constraints={"audio": True, "video": False},
         ),
+        audio_processor_factory=lambda: audio_callback
     )
 
-    if webrtc_ctx.audio_receiver:
-        audio_frames = webrtc_ctx.audio_receiver.get_frames(timeout=1)
-        if audio_frames:
-            audio = audio_frames[-1].to_ndarray()
-            audio = AudioSegment(
-                data=audio.tobytes(),
-                sample_width=audio.dtype.itemsize,
-                frame_rate=audio_frames[-1].rate,
-                channels=1
-            )
+    if webrtc_ctx.state.playing:
+        if "recognized_text" in st.session_state:
+            recognized_text = st.session_state.recognized_text
+            st.write(f"Recognized Speech: {recognized_text}")
 
-            # Convert audio to wav format for recognition
-            audio_wav = io.BytesIO()
-            audio.export(audio_wav, format="wav")
-            audio_wav.seek(0)
-            audio_data = sr.AudioFile(audio_wav)
-            recognizer = sr.Recognizer()
-            with audio_data as source:
-                audio_content = recognizer.record(source)
-                user_question = recognize_speech(audio_content)
-                st.write(f"Recognized Speech: {user_question}")
+            # Add recognized speech to message history
+            st.session_state.messages.append({"role": "user", "question": recognized_text})
 
-                # Add recognized speech to message history
-                st.session_state.messages.append({"role": "user", "question": user_question})
-
-                try:
-                    with st.spinner("Analyzing..."):
-                        response = analyst.chat(user_question)
-                        st.write(response)
-                        st.session_state.messages.append({"role": "assistant", "response": response})
-                except Exception as e:
-                    st.write(e)
-                    error_message = "⚠️Sorry, Couldn't generate the answer! Please try rephrasing your question!"
-                    st.session_state.messages.append({"role": "assistant", "error": error_message})
+            try:
+                with st.spinner("Analyzing..."):
+                    response = analyst.chat(recognized_text)
+                    st.write(response)
+                    st.session_state.messages.append({"role": "assistant", "response": response})
+            except Exception as e:
+                st.write(e)
+                error_message = "⚠️Sorry, Couldn't generate the answer! Please try rephrasing your question!"
+                st.session_state.messages.append({"role": "assistant", "error": error_message})
 
     # Getting the questions from the users
     user_question = st.chat_input("What are you curious about? ")
