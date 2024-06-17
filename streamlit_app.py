@@ -142,6 +142,7 @@ def chat_window(analyst):
             audio.export(audio_wav, format="wav")
             audio_wav.seek(0)
             audio_data = sr.AudioFile(audio_wav)
+            recognizer = sr.Recognizer()
             with audio_data as source:
                 audio_content = recognizer.record(source)
                 user_question = recognize_speech(audio_content)
