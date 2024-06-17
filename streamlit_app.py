@@ -122,13 +122,10 @@ def chat_window(analyst):
             elif 'error' in message:
                 st.text(message['error'])
     #Getting the questions from the users
-    
-    speech_input = st.write(speech_to_text(language='en'))
-    user_question = st.chat_input("ask")
-    #user_question = speech_input
+    user_question = st.chat_input("What are you curious about? ")
 
     
-    if speech_input:
+    if user_question:
         #Displaying the user question in the chat message
         with st.chat_message("user"):
             st.markdown(user_question)
@@ -196,5 +193,3 @@ def extract_dataframes(raw_file):
 
 if __name__ == "__main__":
     main()
-
-
