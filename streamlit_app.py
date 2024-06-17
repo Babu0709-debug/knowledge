@@ -122,7 +122,11 @@ def chat_window(analyst):
             elif 'error' in message:
                 st.text(message['error'])
     #Getting the questions from the users
-    user_question = st.chat_input("What are you curious about? ")
+    speech_text = speech_to_text(language='en')
+    #st.write(speech_text)
+    #user_question = st.chat_input("Enter your question here", value=speech_text)
+    user_question = st.text_input("Enter your question here", value=speech_text)
+    #st.write(type(user_question))
 
     
     if user_question:
@@ -131,12 +135,14 @@ def chat_window(analyst):
             st.markdown(user_question)
         #Adding user question to chat history
         st.session_state.messages.append({"role":"user","question":user_question})
+        #st.write(type(user_question))
        
         try:
             with st.spinner("Analyzing..."):
                 response = analyst.chat(user_question)
                 st.write(response)
                 st.session_state.messages.append({"role":"assistant","response":response})
+                #st.write(type(user_question))
         
         except Exception as e:
             st.write(e)
