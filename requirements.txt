@@ -2,3 +2,11 @@ streamlit
 pandas
 pandasai
 openai
+numpy
+plotly
+pyYAML
+langchain_google_genai
+google-generativeai
+python-dotenv
+xlrd
+openpyxl
