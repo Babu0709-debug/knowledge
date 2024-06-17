@@ -124,7 +124,7 @@ def chat_window(analyst):
     #Getting the questions from the users
     
     speech_input = st.write(speech_to_text(language='en'))
-    user_question = st.chat_input(speech_input)
+    user_question = st.chat_input("ask")
     #user_question = speech_input
 
     
