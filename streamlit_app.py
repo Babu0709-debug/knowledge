@@ -9,6 +9,7 @@ from pandasai.responses.streamlit_response import StreamlitResponse
 import os
 import speech_recognition as sr
 from streamlit_webrtc import webrtc_streamer, WebRtcMode, ClientSettings
+from streamlit_mic_recorder import mic_recorder, speech_to_text
 from pydub import AudioSegment
 import av
 import io
@@ -122,6 +123,7 @@ def chat_window(analyst):
                 st.text(message['error'])
     #Getting the questions from the users
     user_question = st.chat_input("What are you curious about? ")
+    speech_input = speech_to_text(language='en')
 
     
     if user_question:
