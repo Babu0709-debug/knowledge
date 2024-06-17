@@ -122,8 +122,10 @@ def chat_window(analyst):
             elif 'error' in message:
                 st.text(message['error'])
     #Getting the questions from the users
-    user_question = st.chat_input("What are you curious about? ")
+    
     speech_input = st.write(speech_to_text(language='en'))
+    #user_question = st.chat_input("What are you curious about? ")
+    user_question = speech_input
 
     
     if speech_input:
