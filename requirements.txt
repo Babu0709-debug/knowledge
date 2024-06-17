@@ -15,3 +15,16 @@ streamlit-webrtc
 SpeechRecognition
 pydub==0.25.1
 streamlit_mic_recorder
+google-generativeai
+seaborn
+pyyaml
+matplotlib
+pyaudio==0.2.11
+Flask
+werkzeug
+requests
+opencv-python-headless
+av
+streamlit-webrtc
+streamlit_mic_recorder 
+google-cloud-speech
