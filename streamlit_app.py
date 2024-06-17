@@ -123,7 +123,7 @@ def chat_window(analyst):
                 st.text(message['error'])
     #Getting the questions from the users
     
-    speech_input = speech_to_text(language='en')
+    speech_input = st.write(speech_to_text(language='en'))
     user_question = st.chat_input(speech_input)
     #user_question = speech_input
 
