@@ -10,7 +10,7 @@ google-generativeai
 python-dotenv
 xlrd
 openpyxl
-python-dotenv==0.21.0
-streamlit-webrtc==0.38.0
-SpeechRecognition==3.8.1
+python-dotenv
+streamlit-webrtc
+SpeechRecognition
 pydub==0.25.1
