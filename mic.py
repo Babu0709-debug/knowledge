@@ -1,45 +1,49 @@
 import streamlit as st
+from streamlit_webrtc import webrtc_streamer, AudioProcessorBase, VideoProcessorBase, WebRtcMode
 import speech_recognition as sr
 
-def listen_and_recognize():
-  """Listens for user speech using browser microphone and returns text."""
+# Initialize the recognizer
+recognizer = sr.Recognizer()
 
-  recognizer = sr.Recognizer()
+class AudioProcessor(AudioProcessorBase):
+    def __init__(self):
+        self.recognizer = sr.Recognizer()
+        self.audio_text = None
 
-  # Use browser microphone (limited browser compatibility)
-  with sr.Microphone() as source:
-    st.write("Listening...")
-    audio = recognizer.listen(source)
-
-  try:
-    query = recognizer.recognize_google(audio)
-    st.write("You said: " + query)
-    return query
-  except sr.UnknownValueError:
-    st.error("Sorry, could not understand audio. Please try again.")
-    return None
+    def recv(self, frame):
+        audio_data = frame.to_ndarray()
+        audio_source = sr.AudioData(audio_data.tobytes(), frame.sample_rate, frame.sample_width)
+        
+        try:
+            self.audio_text = self.recognizer.recognize_google(audio_source)
+            st.session_state.audio_text = self.audio_text
+        except sr.UnknownValueError:
+            st.session_state.audio_text = "Could not understand audio"
+        except sr.RequestError as e:
+            st.session_state.audio_text = f"Could not request results; {e}"
+        return frame
 
 def main():
-  """Main function to display UI and handle speech recognition."""
+    st.title("Webcam and Audio Capture with Streamlit")
 
-  st.title("Speech Recognition Chatbox (Streamlit Cloud)")
+    if 'audio_text' not in st.session_state:
+        st.session_state.audio_text = ""
 
-  # Initialize session state variables (optional)
-  if 'listening' not in st.session_state:
-      st.session_state.listening = False
+    # Start the webrtc streamer
+    webrtc_ctx = webrtc_streamer(
+        key="example",
+        mode=WebRtcMode.SENDRECV,
+        audio_processor_factory=AudioProcessor,
+        media_stream_constraints={"video": True, "audio": True}
+    )
 
-  # Button for starting/stopping listening
-  if st.button("Start Listening"):
-      st.session_state.listening = True
-  if st.button("Stop Listening") and 'listening' in st.session_state:
-      st.session_state.listening = False
-
-  # Handle listening state
-  if st.session_state.listening:
-      query = listen_and_recognize()
-
-  # Display chat messages (optional)
-  # ... (implement chat message display logic if desired)
+    # Display the recognized text after stopping the stream
+    if st.button("Stop Listening"):
+        webrtc_ctx.stop()
+        if st.session_state.audio_text:
+            st.write(f"Recognized Text: {st.session_state.audio_text}")
+        else:
+            st.write("No audio captured or unable to recognize speech")
 
 if __name__ == "__main__":
-  main()
+    main()
