@@ -1,32 +1,53 @@
 import streamlit as st
-import cv2  # OpenCV for image processing
+from streamlit_webrtc import webrtc_streamer, AudioProcessorBase, VideoProcessorBase, WebRtcMode
+import speech_recognition as sr
 
-def capture_image():
-  """Captures an image using the webcam and displays it."""
-  cap = cv2.VideoCapture(0)  # Open default webcam (0)
+# Initialize the recognizer
+recognizer = sr.Recognizer()
 
-  if not cap.isOpened():
-    st.error("Error opening camera!")
-    return
+class AudioProcessor(AudioProcessorBase):
+    def __init__(self):
+        self.recognizer = sr.Recognizer()
+        self.audio_text = None
 
-  # Capture image on button click
-  if st.button("Capture Image"):
-    ret, frame = cap.read()
-    if ret:
-      cv2.imwrite("captured_image.jpg", frame)
-      st.success("Image captured successfully!")
-      # Display captured image (optional)
-      st.image("captured_image.jpg", use_column_width=True)
-    else:
-      st.error("Failed to capture image!")
-
-  cap.release()  # Release camera resources
+    def recv(self, frame):
+        audio_data = frame.to_ndarray()
+        audio_source = sr.AudioData(audio_data.tobytes(), frame.sample_rate, frame.sample_width)
+        
+        try:
+            self.audio_text = self.recognizer.recognize_google(audio_source)
+            st.session_state.audio_text = self.audio_text
+        except sr.UnknownValueError:
+            st.session_state.audio_text = "Could not understand audio"
+        except sr.RequestError as e:
+            st.session_state.audio_text = f"Could not request results; {e}"
+        return frame
 
 def main():
-  """Main function for UI and image capture."""
-  st.title("Image Capture (Streamlit Cloud)")
+    st.title("Webcam and Audio Capture with Streamlit")
 
-  capture_image()  # Call image capture function
+    if 'audio_text' not in st.session_state:
+        st.session_state.audio_text = ""
+
+    # Start the webrtc streamer
+    try:
+        webrtc_ctx = webrtc_streamer(
+            key="example",
+            mode=WebRtcMode.SENDRECV,
+            audio_processor_factory=AudioProcessor,
+            media_stream_constraints={"video": True, "audio": True}
+        )
+
+        # Display the recognized text after stopping the stream
+        if st.button("Stop Listening"):
+            webrtc_ctx.stop()
+            if st.session_state.audio_text:
+                st.write(f"Recognized Text: {st.session_state.audio_text}")
+            else:
+                st.write("No audio captured or unable to recognize speech")
+    except Exception as e:
+        st.error(f"Error accessing camera or microphone: {e}")
+        st.stop()
 
 if __name__ == "__main__":
-  main()
+    main()
