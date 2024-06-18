@@ -31,6 +31,4 @@ speechrecognition
 sounddevice
 soundfile
 whisper
-Python >=3.7
-PyAudio
-Portaudio
+
