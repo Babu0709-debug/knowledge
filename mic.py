@@ -1,49 +1,45 @@
 import streamlit as st
-from streamlit_webrtc import webrtc_streamer, AudioProcessorBase, VideoProcessorBase, WebRtcMode
-import speech_recognition as sr
+import sounddevice as sd  # for microphone recording
+import soundfile as sf  # for audio file handling
+import whisper  # OpenAI Whisper library
 
-# Initialize the recognizer
-recognizer = sr.Recognizer()
+def listen_and_recognize():
 
-class AudioProcessor(AudioProcessorBase):
-    def __init__(self):
-        self.recognizer = sr.Recognizer()
-        self.audio_text = None
+  # Microphone recording parameters
+  duration = 5  # Recording duration in seconds
+  fs = 16000  # Sampling rate
 
-    def recv(self, frame):
-        audio_data = frame.to_ndarray()
-        audio_source = sr.AudioData(audio_data.tobytes(), frame.sample_rate, frame.sample_width)
-        
-        try:
-            self.audio_text = self.recognizer.recognize_google(audio_source)
-            st.session_state.audio_text = self.audio_text
-        except sr.UnknownValueError:
-            st.session_state.audio_text = "Could not understand audio"
-        except sr.RequestError as e:
-            st.session_state.audio_text = f"Could not request results; {e}"
-        return frame
+  # Record audio from microphone
+  try:
+    print("Recording...")
+    myrecording = sd.rec(int(duration * fs), samplerate=fs, channels=1)
+    sd.wait()
+    print("Done recording!")
+  except Exception as e:
+    st.error(f"Error recording audio: {e}")
+    return None
+
+  # Convert recording to audio buffer
+  audio_buffer = myrecording.copy()
+
+  # Use Whisper model for speech recognition
+  result = model.transcribe(audio_buffer)
+
+  st.write("You said: " + result["text"])
+  return result["text"]
 
 def main():
-    st.title("Webcam and Audio Capture with Streamlit")
+  st.title("Speech Recognition Chatbox (OpenAI Whisper)")
 
-    if 'audio_text' not in st.session_state:
-        st.session_state.audio_text = ""
+  # Load Whisper model (Optional)
+  model = whisper.load_model("base")  # Options: "base", "medium", "large"
 
-    # Start the webrtc streamer
-    webrtc_ctx = webrtc_streamer(
-        key="example",
-        mode=WebRtcMode.SENDRECV,
-        audio_processor_factory=AudioProcessor,
-        media_stream_constraints={"video": True, "audio": True}
-    )
+  # ... (rest of your Streamlit UI logic)
 
-    # Display the recognized text after stopping the stream
-    if st.button("Stop Listening"):
-        webrtc_ctx.stop()
-        if st.session_state.audio_text:
-            st.write(f"Recognized Text: {st.session_state.audio_text}")
-        else:
-            st.write("No audio captured or unable to recognize speech")
+  if st.button("Recognize Speech from Microphone"):
+    query = listen_and_recognize()
+
+    # ... (handle recognized text, display chat messages, etc.)
 
 if __name__ == "__main__":
-    main()
+  main()
