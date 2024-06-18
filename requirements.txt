@@ -31,3 +31,5 @@ speechrecognition
 sounddevice
 soundfile
 whisper
+pyaudio
+PortAudio
