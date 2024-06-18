@@ -1,45 +1,45 @@
 import streamlit as st
-import sounddevice as sd  # for microphone recording
-import soundfile as sf  # for audio file handling
-import whisper  # OpenAI Whisper library
+import speech_recognition as sr
 
 def listen_and_recognize():
+  """Listens for user speech using browser microphone and returns text."""
 
-  # Microphone recording parameters
-  duration = 5  # Recording duration in seconds
-  fs = 16000  # Sampling rate
+  recognizer = sr.Recognizer()
 
-  # Record audio from microphone
+  # Use browser microphone (limited browser compatibility)
+  with sr.Microphone() as source:
+    st.write("Listening...")
+    audio = recognizer.listen(source)
+
   try:
-    print("Recording...")
-    myrecording = sd.rec(int(duration * fs), samplerate=fs, channels=1)
-    sd.wait()
-    print("Done recording!")
-  except Exception as e:
-    st.error(f"Error recording audio: {e}")
+    query = recognizer.recognize_google(audio)
+    st.write("You said: " + query)
+    return query
+  except sr.UnknownValueError:
+    st.error("Sorry, could not understand audio. Please try again.")
     return None
 
-  # Convert recording to audio buffer
-  audio_buffer = myrecording.copy()
-
-  # Use Whisper model for speech recognition
-  result = model.transcribe(audio_buffer)
-
-  st.write("You said: " + result["text"])
-  return result["text"]
-
 def main():
-  st.title("Speech Recognition Chatbox (OpenAI Whisper)")
+  """Main function to display UI and handle speech recognition."""
 
-  # Load Whisper model (Optional)
-  model = whisper.load_model("base")  # Options: "base", "medium", "large"
+  st.title("Speech Recognition Chatbox (Streamlit Cloud)")
 
-  # ... (rest of your Streamlit UI logic)
+  # Initialize session state variables (optional)
+  if 'listening' not in st.session_state:
+      st.session_state.listening = False
 
-  if st.button("Recognize Speech from Microphone"):
-    query = listen_and_recognize()
+  # Button for starting/stopping listening
+  if st.button("Start Listening"):
+      st.session_state.listening = True
+  if st.button("Stop Listening") and 'listening' in st.session_state:
+      st.session_state.listening = False
 
-    # ... (handle recognized text, display chat messages, etc.)
+  # Handle listening state
+  if st.session_state.listening:
+      query = listen_and_recognize()
+
+  # Display chat messages (optional)
+  # ... (implement chat message display logic if desired)
 
 if __name__ == "__main__":
   main()
