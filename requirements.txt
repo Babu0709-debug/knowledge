@@ -28,4 +28,6 @@ streamlit-webrtc
 streamlit_mic_recorder 
 google-cloud-speech
 speechrecognition
-speech_recognition
+sounddevice
+soundfile
+whisper
