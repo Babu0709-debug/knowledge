@@ -1,8 +1,8 @@
 import streamlit as st
 from streamlit_webrtc import webrtc_streamer, AudioProcessorBase, VideoProcessorBase, WebRtcMode
 import speech_recognition as sr
-import cv2
 import numpy as np
+import av
 
 # Initialize the recognizer
 recognizer = sr.Recognizer()
@@ -15,11 +15,11 @@ class AudioProcessor(AudioProcessorBase):
 
     def recv(self, frame):
         if self.is_recording:
-            audio_data = frame.to_ndarray()
-            if audio_data.ndim == 1:
-                audio_data = np.expand_dims(audio_data, axis=1)
-            audio_data = audio_data.astype(np.int16).tobytes()
-            audio_source = sr.AudioData(audio_data, frame.sample_rate, frame.sample_width)
+            audio_frame = frame.to_ndarray()
+            if audio_frame.ndim == 1:
+                audio_frame = np.expand_dims(audio_frame, axis=1)
+            audio_data = av.AudioFrame.from_ndarray(audio_frame, layout="mono")
+            audio_source = sr.AudioData(audio_data.to_bytes(), frame.sample_rate, frame.sample_width)
             
             try:
                 self.audio_text = self.recognizer.recognize_google(audio_source)
@@ -68,7 +68,8 @@ def main():
             if st.session_state.captured_image is not None:
                 st.image(st.session_state.captured_image, caption="Captured Image")
                 # Save image to local storage
-                cv2.imwrite("captured_image.png", cv2.cvtColor(st.session_state.captured_image, cv2.COLOR_RGB2BGR))
+                with open("captured_image.png", "wb") as f:
+                    f.write(cv2.imencode('.png', st.session_state.captured_image)[1].tobytes())
 
     if webrtc_ctx.audio_processor:
         if st.button("Start Recording"):
