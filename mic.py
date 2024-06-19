@@ -3,7 +3,6 @@ from streamlit_webrtc import webrtc_streamer, AudioProcessorBase, VideoProcessor
 import speech_recognition as sr
 import cv2
 import numpy as np
-import numpy
 
 # Initialize the recognizer
 recognizer = sr.Recognizer()
@@ -17,7 +16,10 @@ class AudioProcessor(AudioProcessorBase):
     def recv(self, frame):
         if self.is_recording:
             audio_data = frame.to_ndarray()
-            audio_source = sr.AudioData(audio_data.tobytes(), frame.sample_rate, frame.sample_width)
+            if audio_data.ndim == 1:
+                audio_data = np.expand_dims(audio_data, axis=1)
+            audio_data = audio_data.astype(np.int16).tobytes()
+            audio_source = sr.AudioData(audio_data, frame.sample_rate, frame.sample_width)
             
             try:
                 self.audio_text = self.recognizer.recognize_google(audio_source)
@@ -41,11 +43,6 @@ class VideoProcessor(VideoProcessorBase):
     def recv(self, frame):
         self.frame = frame.to_image()
         return frame
-
-def apply_noise_cancellation(audio_data):
-    # This is a placeholder function for noise cancellation.
-    # Implement noise cancellation logic as needed.
-    return audio_data
 
 def main():
     st.title("Webcam and Audio Capture with Streamlit")
