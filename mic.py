@@ -53,38 +53,33 @@ def main():
     if 'captured_image' not in st.session_state:
         st.session_state.captured_image = None
 
-    # Start the webrtc streamer
-    try:
-        webrtc_ctx = webrtc_streamer(
-            key="example",
-            mode=WebRtcMode.SENDRECV,
-            audio_processor_factory=AudioProcessor,
-            video_processor_factory=VideoProcessor,
-            media_stream_constraints={"video": True, "audio": True}
-        )
+    # Initialize the webrtc context
+    webrtc_ctx = webrtc_streamer(
+        key="example",
+        mode=WebRtcMode.SENDRECV,
+        audio_processor_factory=AudioProcessor,
+        video_processor_factory=VideoProcessor,
+        media_stream_constraints={"video": True, "audio": True}
+    )
 
-        if webrtc_ctx.video_processor:
-            if st.button("Capture Image"):
-                st.session_state.captured_image = np.array(webrtc_ctx.video_processor.frame)
-                if st.session_state.captured_image is not None:
-                    st.image(st.session_state.captured_image, caption="Captured Image")
+    if webrtc_ctx.video_processor:
+        if st.button("Capture Image"):
+            st.session_state.captured_image = np.array(webrtc_ctx.video_processor.frame)
+            if st.session_state.captured_image is not None:
+                st.image(st.session_state.captured_image, caption="Captured Image")
+                # Save image to local storage
+                cv2.imwrite("captured_image.png", cv2.cvtColor(st.session_state.captured_image, cv2.COLOR_RGB2BGR))
 
-                    # Save image to local storage
-                    cv2.imwrite("captured_image.png", cv2.cvtColor(st.session_state.captured_image, cv2.COLOR_RGB2BGR))
+    if webrtc_ctx.audio_processor:
+        if st.button("Start Recording"):
+            webrtc_ctx.audio_processor.start_recording()
 
-        if webrtc_ctx.audio_processor:
-            if st.button("Start Recording"):
-                webrtc_ctx.audio_processor.start_recording()
-
-            if st.button("Stop Listening"):
-                webrtc_ctx.audio_processor.stop_recording()
-                if st.session_state.audio_text:
-                    st.write(f"Recognized Text: {st.session_state.audio_text}")
-                else:
-                    st.write("No audio captured or unable to recognize speech")
-
-    except Exception as e:
-        st.error(f"Error accessing camera or microphone: {e}")
+        if st.button("Stop Listening"):
+            webrtc_ctx.audio_processor.stop_recording()
+            if st.session_state.audio_text:
+                st.write(f"Recognized Text: {st.session_state.audio_text}")
+            else:
+                st.write("No audio captured or unable to recognize speech")
 
 if __name__ == "__main__":
     main()
