@@ -63,19 +63,23 @@ def main():
     )
 
     if webrtc_ctx.video_processor:
-        if st.button("Capture Image"):
+        capture_image_button = st.button("Capture Image")
+        if capture_image_button:
             st.session_state.captured_image = np.array(webrtc_ctx.video_processor.frame)
             if st.session_state.captured_image is not None:
                 st.image(st.session_state.captured_image, caption="Captured Image")
                 # Save image to local storage
                 with open("captured_image.png", "wb") as f:
-                    f.write(cv2.imencode('.png', st.session_state.captured_image)[1].tobytes())
+                    f.write(cv2.imencode('.png', cv2.cvtColor(st.session_state.captured_image, cv2.COLOR_RGB2BGR))[1].tobytes())
 
     if webrtc_ctx.audio_processor:
-        if st.button("Start Recording"):
+        start_recording_button = st.button("Start Recording")
+        stop_recording_button = st.button("Stop Listening")
+
+        if start_recording_button:
             webrtc_ctx.audio_processor.start_recording()
 
-        if st.button("Stop Listening"):
+        if stop_recording_button:
             webrtc_ctx.audio_processor.stop_recording()
             if st.session_state.audio_text:
                 st.write(f"Recognized Text: {st.session_state.audio_text}")
