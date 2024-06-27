@@ -21,6 +21,18 @@ load_dotenv()
 # Dictionary to store the extracted dataframes
 data = {}
 
+class OpenAILLM:
+    def __init__(self, api_key):
+        openai.api_key = api_key
+
+    def chat(self, prompt):
+        response = openai.Completion.create(
+            engine="davinci-codex",
+            prompt=prompt,
+            max_tokens=150
+        )
+        return response.choices[0].text.strip()
+
 def main():
     st.set_page_config(page_title="PandasAI", page_icon="🐼")
     st.title("Chat with Your Data using PandasAI:🐼")
@@ -73,10 +85,9 @@ def get_LLM(llm_type, user_api_key):
             llm = ChatGoogleGenerativeAI(model="gemini-pro", temperature=0.3, google_api_key=user_api_key)
         elif llm_type == 'openai':
             if user_api_key:
-                openai.api_key = user_api_key
+                llm = OpenAILLM(api_key=user_api_key)
             else:
-                openai.api_key = os.getenv("OPENAI_API_KEY")
-            llm = openai
+                llm = OpenAILLM(api_key=os.getenv("OPENAI_API_KEY"))
         return llm
     except Exception as e:
         st.error("No/Incorrect API key provided! Please Provide/Verify your API key")
