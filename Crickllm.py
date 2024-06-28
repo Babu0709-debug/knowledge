@@ -4,7 +4,7 @@ import os
 from pandasai import SmartDatalake
 
 # Set the PandasAI API key (replace with secure handling in production)
-os.environ['PANDASAI_API_KEY'] = "$2a$10$EZR8MburZX.DLE0D14ncWefFUc/2uVQVHP0x.OMfw4VYqKcjBWe4O"
+os.environ['PANDASAI_API_KEY'] = "$2a$10$u5ND912T6dBJAAXfkkSeteoPqFATTH0W8252czTjWo6dIy1hFOQP."
 
 # Function to load data
 def load_data(uploaded_file):
