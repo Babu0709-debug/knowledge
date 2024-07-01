@@ -21,13 +21,13 @@ load_dotenv()
 data = {}
 
 def main():
-    st.set_page_config(page_title = "PandasAI",page_icon = "🐼")
-    st.title("Chat with Your Data using PandasAI:🐼")
+    st.set_page_config(page_title = "FP&A",page_icon = "🤖")
+    st.title("Talk With Babu's Data")
     #reading the csv file
     
     #Side Menu Bar
     with st.sidebar:
-        st.title("Configuration:⚙️")
+        st.title("FP&A Analysis")
         #Activating Demo Data
         st.text("Data Setup: 📝")
         file_upload = st.file_uploader("Upload your Data",accept_multiple_files=False,type = ['csv','xls','xlsx'])
@@ -40,7 +40,7 @@ def main():
                             ('BambooLLM','gemini-pro'),index=0)
         
         #Adding users API Key
-        user_api_key = st.text_input('Please add your API key',placeholder='Paste your API key here',type = 'password')
+        user_api_key = st.text_input('Please commit',placeholder='Paste your API key here',type = 'password')
         
         #Get Pandas API key here
         #st.markdown("[Get Your PandasAI API key here](https://www.pandabi.ai/auth/sign-up)")
