@@ -31,4 +31,5 @@ speechrecognition
 sounddevice
 soundfile
 whisper
-
+tiktoken
+langchain
