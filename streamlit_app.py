@@ -51,8 +51,9 @@ def main():
         if llm:
             # Instantiating PandasAI agent
             analyst = get_agent(data, llm)
-            # Starting the chat with the PandasAI agent
-            chat_window(analyst)
+            if analyst:
+                # Starting the chat with the PandasAI agent
+                chat_window(analyst)
             
     else:
         st.warning("Please upload your data first! You can upload a CSV or an Excel file.")
@@ -82,7 +83,8 @@ def get_LLM(llm_type, user_api_key):
         return llm
 
     except Exception as e:
-        st.error("No/Incorrect API key provided! Please Provide/Verify your API key")
+        st.error(f"No/Incorrect API key provided! Please Provide/Verify your API key. Error: {e}")
+        return None
 
 def chat_window(analyst):
     with st.chat_message("assistant"):
@@ -122,7 +124,7 @@ def chat_window(analyst):
         
         except Exception as e:
             st.write(e)
-            error_message = "⚠️Sorry, Couldn't generate the answer! Please try rephrasing your question!"
+            st.session_state.messages.append({"role": "assistant", "error": "⚠️Sorry, Couldn't generate the answer! Please try rephrasing your question!"})
 
     def clear_chat_history():
         st.session_state.messages = []
@@ -131,20 +133,28 @@ def chat_window(analyst):
     st.sidebar.button("CLEAR 🗑️", on_click=clear_chat_history)
 
 def get_agent(data, llm):
-    agent = Agent(list(data.values()), config={"llm": llm, "verbose": True, "response_parser": StreamlitResponse})
-    return agent
+    try:
+        agent = Agent(list(data.values()), config={"llm": llm, "verbose": True, "response_parser": StreamlitResponse})
+        return agent
+    except Exception as e:
+        st.error(f"Error creating agent: {e}")
+        return None
 
 def extract_dataframes(raw_file):
     dfs = {}
-    if raw_file.name.split('.')[1] == 'csv':
-        csv_name = raw_file.name.split('.')[0]
-        df = pd.read_csv(raw_file)
-        dfs[csv_name] = df
-    elif raw_file.name.split('.')[1] in ['xlsx', 'xls']:
-        xls = pd.ExcelFile(raw_file)
-        for sheet_name in xls.sheet_names:
-            dfs[sheet_name] = pd.read_excel(raw_file, sheet_name=sheet_name)
-    return dfs
+    try:
+        if raw_file.name.split('.')[1] == 'csv':
+            csv_name = raw_file.name.split('.')[0]
+            df = pd.read_csv(raw_file)
+            dfs[csv_name] = df
+        elif raw_file.name.split('.')[1] in ['xlsx', 'xls']:
+            xls = pd.ExcelFile(raw_file)
+            for sheet_name in xls.sheet_names:
+                dfs[sheet_name] = pd.read_excel(raw_file, sheet_name=sheet_name)
+        return dfs
+    except Exception as e:
+        st.error(f"Error extracting dataframes: {e}")
+        return {}
 
 if __name__ == "__main__":
     main()
