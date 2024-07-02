@@ -1,33 +1,56 @@
 import streamlit as st
-from langchain.llms import OpenAI
-import tiktoken
+import pandas as pd
+import openai
+import os
 
-st.title('GeekBot')
+# Set your OpenAI API key
+openai.api_key = os.getenv('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')
 
-openai_api_key = st.sidebar.text_input('OpenAI API Key')
+def generate_analysis(dataframe):
+    # Convert dataframe to CSV string
+    csv_data = dataframe.to_csv(index=False)
 
-def count_tokens(string: str) -> int:
-	# Load the encoding for gpt-3.5-turbo (which uses cl100k_base)
-	encoding_name = "p50k_base"
-	encoding = tiktoken.get_encoding(encoding_name) 
-	# Encode the input string and count the tokens
-	num_tokens = len(encoding.encode(string))
-	return num_tokens
+    # Define the prompt for OpenAI GPT
+    prompt = f"""
+    Analyze the following dataset:
+    {csv_data}
 
-def generate_response(input_text):
-	try:
-		llm = OpenAI(temperature=0.7, openai_api_key=openai_api_key)
-		response = llm(input_text)
-		num_tokens = count_tokens(input_text)
-		st.info(f"Input contains {num_tokens} tokens.")
-		st.info(response)
-	except Exception as e:
-		st.error(f"An error occurred: {str(e)}")
+    Provide a summary analysis including:
+    - Key statistics (mean, median, etc.)
+    - Any noticeable trends or patterns
+    - Any potential outliers or anomalies
+    """
 
-with st.form('my_form'):
-text = st.text_area('Enter text:', 'How to get started with DSA')
-submitted = st.form_submit_button('Submit')
-if not openai_api_key.startswith('sk-'):
-	st.warning('Please enter your OpenAI API key!', icon='')
-if submitted and openai_api_key.startswith('sk-'):
-	generate_response(text)
+    # Call the OpenAI GPT API
+    response = openai.Completion.create(
+        engine="text-davinci-003",
+        prompt=prompt,
+        max_tokens=150
+    )
+
+    # Extract the text from the response
+    analysis = response.choices[0].text.strip()
+    return analysis
+
+# Streamlit UI
+st.title("Data Analysis with OpenAI GPT")
+
+# File uploader
+uploaded_file = st.file_uploader("Upload your CSV file", type="csv")
+
+if uploaded_file is not None:
+    # Read the CSV file
+    df = pd.read_csv(uploaded_file)
+    st.write("Dataset:")
+    st.dataframe(df)
+
+    # Generate analysis
+    analysis = generate_analysis(df)
+    st.write("Analysis:")
+    st.text(analysis)
+else:
+    st.write("Please upload a CSV file to analyze.")
+
+# Streamlit running instructions
+st.write("To run this app, use the following command in your terminal:")
+st.code("streamlit run app.py")
