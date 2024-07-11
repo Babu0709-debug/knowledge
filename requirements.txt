@@ -33,3 +33,4 @@ soundfile
 whisper
 tiktoken
 langchain
+meta_ai_api
