@@ -15,6 +15,7 @@ from streamlit_mic_recorder import mic_recorder, speech_to_text
 from pydub import AudioSegment
 import av
 import io
+import json
 
 # Load environment variables
 load_dotenv()
@@ -130,14 +131,21 @@ def chat_window(analyst, llm_type):
             with st.spinner("Analyzing..."):
                 if llm_type == 'meta-ai':
                     response = analyst.prompt(message=user_question)
+                    try:
+                        response_json = json.loads(response)
+                        st.write(response_json)
+                        st.session_state.messages.append({"role": "assistant", "response": response_json})
+                    except json.JSONDecodeError:
+                        st.write(response)
+                        st.session_state.messages.append({"role": "assistant", "response": response})
                 else:
                     response = analyst.chat(user_question)
-                st.write(response)
-                st.session_state.messages.append({"role": "assistant", "response": response})
+                    st.write(response)
+                    st.session_state.messages.append({"role": "assistant", "response": response})
 
         except Exception as e:
-            st.write(e)
-            error_message = "⚠️Sorry, Couldn't generate the answer! Please try rephrasing your question!"
+            st.error("⚠️Sorry, Couldn't generate the answer! Please try rephrasing your question or try again later.")
+            st.session_state.messages.append({"role": "assistant", "error": str(e)})
 
     # Function to clear history
     def clear_chat_history():
