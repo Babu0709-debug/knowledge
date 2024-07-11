@@ -53,11 +53,14 @@ def main():
         llm = get_LLM(llm_type, user_api_key)
 
         if llm:
-            # Instantiating PandasAI agent
-            analyst = get_agent(data, llm)
+            # Instantiating PandasAI agent if not using MetaAI
+            if llm_type != 'meta-ai':
+                analyst = get_agent(data, llm)
+            else:
+                analyst = llm
 
             # Starting the chat with the PandasAI agent
-            chat_window(analyst)
+            chat_window(analyst, llm_type)
 
     else:
         st.warning("Please upload your data first! You can upload a CSV or an Excel file.")
@@ -83,7 +86,7 @@ def get_LLM(llm_type, user_api_key):
             llm = ChatGoogleGenerativeAI(model="gemini-pro", temperature=0.3, google_api_key=user_api_key)
 
         elif llm_type == 'meta-ai':
-            llm = MetaAI(api_key=user_api_key)
+            llm = MetaAI()  # Initialize MetaAI directly without API key
 
         elif llm_type == 'openai-gpt':
             if user_api_key:
@@ -97,7 +100,7 @@ def get_LLM(llm_type, user_api_key):
         st.error("No/Incorrect API key provided! Please Provide/Verify your API key")
 
 # Function for chat window
-def chat_window(analyst):
+def chat_window(analyst, llm_type):
     with st.chat_message("assistant"):
         st.text("Explore Babu's Data")
 
@@ -125,7 +128,10 @@ def chat_window(analyst):
 
         try:
             with st.spinner("Analyzing..."):
-                response = analyst.chat(user_question)
+                if llm_type == 'meta-ai':
+                    response = analyst.prompt(message=user_question)
+                else:
+                    response = analyst.chat(user_question)
                 st.write(response)
                 st.session_state.messages.append({"role": "assistant", "response": response})
 
