@@ -105,7 +105,7 @@ def chat_window(analyst):
     if "messages" not in st.session_state:
         st.session_state.messages = []
 
-    # Displaying the message history on re-reun
+    # Displaying the message history on re-run
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             if 'question' in message:
@@ -170,4 +170,11 @@ def extract_dataframes(raw_file):
         # Read the Excel file
         xls = pd.ExcelFile(raw_file)
         # Iterate through each sheet in the Excel file and store them into dataframes
-        for sheet_name in x
+        for sheet_name in xls.sheet_names:
+            dfs[sheet_name] = pd.read_excel(raw_file, sheet_name=sheet_name)
+
+    # Return the dataframes
+    return dfs
+
+if __name__ == "__main__":
+    main()
