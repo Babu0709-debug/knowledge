@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from langchain_google_genai import ChatGoogleGenerativeAI
 import google.generativeai as genai
+from meta_ai_api import MetaAI
 from dotenv import load_dotenv
 from pandasai.llm import BambooLLM
 from pandasai import Agent
@@ -74,8 +75,7 @@ def get_LLM(llm_type, user_api_key):
             llm = ChatGoogleGenerativeAI(model="gemini-pro", temperature=0.3, google_api_key=user_api_key)
 
         elif llm_type == 'meta-ai':
-            from langchain_meta_ai import ChatMetaAI
-            llm = ChatMetaAI()  # Meta AI does not require an API key
+            llm = MetaAI()  # Meta AI does not require an API key
 
         return llm
     except Exception as e:
@@ -109,8 +109,12 @@ def chat_window(analyst):
 
         try:
             with st.spinner("Analyzing..."):
-                response = analyst.chat(user_question)
-                formatted_response = format_response(response)
+                if isinstance(analyst, MetaAI):
+                    response = analyst.prompt(message=user_question, stream=False)
+                    formatted_response = format_meta_ai_response(response)
+                else:
+                    response = analyst.chat(user_question)
+                    formatted_response = response  # Adjust if needed
                 st.write(formatted_response)
                 st.session_state.messages.append({"role": "assistant", "response": formatted_response})
         except Exception as e:
@@ -140,20 +144,12 @@ def extract_dataframes(raw_file):
             dfs[sheet_name] = pd.read_excel(raw_file, sheet_name=sheet_name)
     return dfs
 
-def format_response(response):
-    # Example formatted response for demonstration purposes
-    formatted_response = {
-        "message": response,
-        "sources": [
-            {"link": "https://www.wolframalpha.com/input?i=San+Francisco+weather+today+and+date", "title": "WolframAlpha"},
-            {"link": "https://www.timeanddate.com/weather/usa/san-francisco", "title": "Weather for San Francisco, California, USA - timeanddate.com"},
-            {"link": "https://www.accuweather.com/en/us/san-francisco/94103/weather-today/347629", "title": "Weather Today for San Francisco, CA | AccuWeather"},
-            {"link": "https://www.accuweather.com/en/us/san-francisco/94103/weather-forecast/347629", "title": "San Francisco, CA Weather Forecast | AccuWeather"},
-            {"link": "https://forecast.weather.gov/zipcity.php?inputstring=San%20francisco%2CCA", "title": "National Weather Service"},
-            {"link": "https://www.wunderground.com/weather/us/ca/san-francisco", "title": "San Francisco, CA Weather Conditions | Weather Underground"}
-        ]
+def format_meta_ai_response(response):
+    # Format response to match the required JSON structure
+    return {
+        "message": response["message"],
+        "sources": response.get("sources", [])
     }
-    return formatted_response
 
 if __name__ == "__main__":
     main()
