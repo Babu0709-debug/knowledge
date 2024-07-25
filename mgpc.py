@@ -2,11 +2,11 @@ import streamlit as st
 import pandas as pd
 from langchain_google_genai import ChatGoogleGenerativeAI
 import google.generativeai as genai
-from meta_ai_api import MetaAI
 from dotenv import load_dotenv
 from pandasai.llm import BambooLLM
 from pandasai import Agent
 from pandasai.responses.streamlit_response import StreamlitResponse
+from meta_ai_api import MetaAI
 import os
 import speech_recognition as sr
 from streamlit_webrtc import webrtc_streamer, WebRtcMode, ClientSettings
@@ -35,7 +35,7 @@ def main():
         # Selecting LLM to use
         llm_type = st.selectbox("Please select LLM", ('BambooLLM', 'gemini-pro', 'meta-ai'), index=0)
 
-        # Adding users API Key
+        # Adding user's API Key
         user_api_key = st.text_input('Please commit', placeholder='Paste your API key here', type='password')
 
     if file_upload is not None:
@@ -46,17 +46,17 @@ def main():
         llm = get_LLM(llm_type, user_api_key)
 
         if llm:
-            # Instantiating PandasAI agent
-            analyst = get_agent(data, llm)
-
-            # Starting the chat with the PandasAI agent
-            chat_window(analyst)
+            if llm_type != 'meta-ai':
+                # Instantiating PandasAI agent if not using MetaAI
+                analyst = get_agent(data, llm)
+                chat_window(analyst)
+            else:
+                # Handle MetaAI directly
+                chat_window(None, llm)
     else:
         st.warning("Please upload your data first! You can upload a CSV or an Excel file.")
 
-# Function to get LLM
 def get_LLM(llm_type, user_api_key):
-    # Creating LLM object based on the llm type selected
     try:
         if llm_type == 'BambooLLM':
             if user_api_key:
@@ -81,16 +81,26 @@ def get_LLM(llm_type, user_api_key):
     except Exception as e:
         st.error("No/Incorrect API key provided! Please Provide/Verify your API key")
 
-# Function for chat window
-def chat_window(analyst):
+def get_agent(data, llm):
+    """
+    The function creates an agent on the dataframes extracted from the uploaded files
+    Args: 
+        data: A Dictionary with the dataframes extracted from the uploaded data
+        llm:  LLM object based on the llm type selected
+    Output: PandasAI Agent or None
+    """
+    if llm:
+        # Handle the case where llm is not MetaAI
+        return Agent(list(data.values()), config={"llm": llm, "verbose": True, "response_parser": StreamlitResponse})
+    return None
+
+def chat_window(analyst, llm=None):
     with st.chat_message("assistant"):
         st.text("Explore Babu's Data")
 
-    # Initializing message history
     if "messages" not in st.session_state:
         st.session_state.messages = []
 
-    # Displaying the message history on re-run
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             if 'question' in message:
@@ -109,47 +119,57 @@ def chat_window(analyst):
 
         try:
             with st.spinner("Analyzing..."):
-                if isinstance(analyst, MetaAI):
-                    response = analyst.prompt(message=user_question, stream=False)
-                    formatted_response = format_meta_ai_response(response)
-                else:
+                if analyst:
+                    # Handle non-MetaAI LLM
                     response = analyst.chat(user_question)
-                    formatted_response = response  # Adjust if needed
+                    formatted_response = response
+                elif llm:
+                    # Handle MetaAI LLM
+                    response = llm.prompt(message=user_question, stream=False)
+                    formatted_response = format_meta_ai_response(response)
                 st.write(formatted_response)
                 st.session_state.messages.append({"role": "assistant", "response": formatted_response})
         except Exception as e:
             st.write(e)
-            error_message = "⚠️Sorry, Couldn't generate the answer! Please try rephrasing your question!"
+            st.write("⚠️Sorry, Couldn't generate the answer! Please try rephrasing your question!")
 
-    # Function to clear history
     def clear_chat_history():
         st.session_state.messages = []
 
     st.sidebar.text("Click to Clear Chat history")
     st.sidebar.button("CLEAR 🗑️", on_click=clear_chat_history)
 
-def get_agent(data, llm):
-    agent = Agent(list(data.values()), config={"llm": llm, "verbose": True, "response_parser": StreamlitResponse})
-    return agent
+def format_meta_ai_response(response):
+    return {
+        "message": response["message"],
+        "sources": response.get("sources", [])
+    }
 
 def extract_dataframes(raw_file):
+    """
+    This function extracts dataframes from the uploaded file/files
+    Args: 
+        raw_file: Upload_File object
+    Processing: Based on the type of file read_csv or read_excel to extract the dataframes
+    Output: 
+        dfs:  a dictionary with the dataframes
+    """
     dfs = {}
     if raw_file.name.split('.')[1] == 'csv':
         csv_name = raw_file.name.split('.')[0]
         df = pd.read_csv(raw_file)
         dfs[csv_name] = df
+
     elif (raw_file.name.split('.')[1] == 'xlsx') or (raw_file.name.split('.')[1] == 'xls'):
+        # Read the Excel file
         xls = pd.ExcelFile(raw_file)
+
+        # Iterate through each sheet in the Excel file and store them into dataframes
         for sheet_name in xls.sheet_names:
             dfs[sheet_name] = pd.read_excel(raw_file, sheet_name=sheet_name)
-    return dfs
 
-def format_meta_ai_response(response):
-    # Format response to match the required JSON structure
-    return {
-        "message": response["message"],
-        "sources": response.get("sources", [])
-    }
+    # return the dataframes
+    return dfs
 
 if __name__ == "__main__":
     main()
