@@ -74,13 +74,8 @@ def get_LLM(llm_type, user_api_key):
             llm = ChatGoogleGenerativeAI(model="gemini-pro", temperature=0.3, google_api_key=user_api_key)
 
         elif llm_type == 'meta-ai':
-            if user_api_key:
-                os.environ["META_AI_API_KEY"] = user_api_key
-            else:
-                os.environ["META_AI_API_KEY"] = os.getenv('META_AI_API_KEY')
-
             from langchain_meta_ai import ChatMetaAI
-            llm = ChatMetaAI(api_key=user_api_key)
+            llm = ChatMetaAI()  # Meta AI does not require an API key
 
         return llm
     except Exception as e:
@@ -115,8 +110,9 @@ def chat_window(analyst):
         try:
             with st.spinner("Analyzing..."):
                 response = analyst.chat(user_question)
-                st.write(response)
-                st.session_state.messages.append({"role": "assistant", "response": response})
+                formatted_response = format_response(response)
+                st.write(formatted_response)
+                st.session_state.messages.append({"role": "assistant", "response": formatted_response})
         except Exception as e:
             st.write(e)
             error_message = "⚠️Sorry, Couldn't generate the answer! Please try rephrasing your question!"
@@ -143,6 +139,21 @@ def extract_dataframes(raw_file):
         for sheet_name in xls.sheet_names:
             dfs[sheet_name] = pd.read_excel(raw_file, sheet_name=sheet_name)
     return dfs
+
+def format_response(response):
+    # Example formatted response for demonstration purposes
+    formatted_response = {
+        "message": response,
+        "sources": [
+            {"link": "https://www.wolframalpha.com/input?i=San+Francisco+weather+today+and+date", "title": "WolframAlpha"},
+            {"link": "https://www.timeanddate.com/weather/usa/san-francisco", "title": "Weather for San Francisco, California, USA - timeanddate.com"},
+            {"link": "https://www.accuweather.com/en/us/san-francisco/94103/weather-today/347629", "title": "Weather Today for San Francisco, CA | AccuWeather"},
+            {"link": "https://www.accuweather.com/en/us/san-francisco/94103/weather-forecast/347629", "title": "San Francisco, CA Weather Forecast | AccuWeather"},
+            {"link": "https://forecast.weather.gov/zipcity.php?inputstring=San%20francisco%2CCA", "title": "National Weather Service"},
+            {"link": "https://www.wunderground.com/weather/us/ca/san-francisco", "title": "San Francisco, CA Weather Conditions | Weather Underground"}
+        ]
+    }
+    return formatted_response
 
 if __name__ == "__main__":
     main()
