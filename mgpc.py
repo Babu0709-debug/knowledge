@@ -14,8 +14,6 @@ from pydub import AudioSegment
 import av
 import io
 
-from meta_ai_api import MetaAI  # Importing MetaAI
-
 # Load environment variables
 load_dotenv()
 
@@ -29,17 +27,16 @@ def main():
     # Side Menu Bar
     with st.sidebar:
         st.title("FP&A Analysis")
-        # Activating Demo Data
         st.text("Data Setup: 📝")
         file_upload = st.file_uploader("Upload your Data", accept_multiple_files=False, type=['csv', 'xls', 'xlsx'])
         st.markdown(":green[*Please ensure the first row has the column names.*]")
 
         # Selecting LLM to use
-        llm_type = st.selectbox("Please select LLM", ('BambooLLM', 'gemini-pro', 'MetaAI'), index=0)
-        
-        # Adding user's API Key
+        llm_type = st.selectbox("Please select LLM", ('BambooLLM', 'gemini-pro', 'meta-ai'), index=0)
+
+        # Adding users API Key
         user_api_key = st.text_input('Please commit', placeholder='Paste your API key here', type='password')
-    
+
     if file_upload is not None:
         data = extract_dataframes(file_upload)
         df = st.selectbox("Here's your uploaded data!", tuple(data.keys()), index=0)
@@ -48,38 +45,49 @@ def main():
         llm = get_LLM(llm_type, user_api_key)
 
         if llm:
-            # Instantiating PandasAI agent if not using MetaAI
-            if llm_type != 'MetaAI':
-                analyst = get_agent(data, llm)
-                chat_window(analyst, llm_type)
-            else:
-                chat_window(None, llm_type)
+            # Instantiating PandasAI agent
+            analyst = get_agent(data, llm)
+
+            # Starting the chat with the PandasAI agent
+            chat_window(analyst)
     else:
         st.warning("Please upload your data first! You can upload a CSV or an Excel file.")
 
 # Function to get LLM
 def get_LLM(llm_type, user_api_key):
+    # Creating LLM object based on the llm type selected
     try:
         if llm_type == 'BambooLLM':
             if user_api_key:
                 os.environ["PANDASAI_API_KEY"] = user_api_key
             else:
                 os.environ["PANDASAI_API_KEY"] = os.getenv('PANDASAI_API_KEY')
+
             llm = BambooLLM()
+
         elif llm_type == 'gemini-pro':
             if user_api_key:
                 genai.configure(api_key=user_api_key)
             else:
                 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+
             llm = ChatGoogleGenerativeAI(model="gemini-pro", temperature=0.3, google_api_key=user_api_key)
-        elif llm_type == 'MetaAI':
-            llm = MetaAI()  # Initialize MetaAI without API key
+
+        elif llm_type == 'meta-ai':
+            if user_api_key:
+                os.environ["META_AI_API_KEY"] = user_api_key
+            else:
+                os.environ["META_AI_API_KEY"] = os.getenv('META_AI_API_KEY')
+
+            from langchain_meta_ai import ChatMetaAI
+            llm = ChatMetaAI(api_key=user_api_key)
+
         return llm
     except Exception as e:
         st.error("No/Incorrect API key provided! Please Provide/Verify your API key")
 
 # Function for chat window
-def chat_window(analyst, llm_type):
+def chat_window(analyst):
     with st.chat_message("assistant"):
         st.text("Explore Babu's Data")
 
@@ -106,19 +114,14 @@ def chat_window(analyst, llm_type):
 
         try:
             with st.spinner("Analyzing..."):
-                if llm_type == 'MetaAI':
-                    response = MetaAI().prompt(message=user_question)
-                    response_text = response.get('message', 'No response from MetaAI. Try again!')
-                else:
-                    response = analyst.chat(user_question)
-                    response_text = response
-
-                st.write(response_text)
-                st.session_state.messages.append({"role": "assistant", "response": response_text})
+                response = analyst.chat(user_question)
+                st.write(response)
+                st.session_state.messages.append({"role": "assistant", "response": response})
         except Exception as e:
             st.write(e)
             error_message = "⚠️Sorry, Couldn't generate the answer! Please try rephrasing your question!"
 
+    # Function to clear history
     def clear_chat_history():
         st.session_state.messages = []
 
@@ -135,7 +138,7 @@ def extract_dataframes(raw_file):
         csv_name = raw_file.name.split('.')[0]
         df = pd.read_csv(raw_file)
         dfs[csv_name] = df
-    elif raw_file.name.split('.')[1] in ['xlsx', 'xls']:
+    elif (raw_file.name.split('.')[1] == 'xlsx') or (raw_file.name.split('.')[1] == 'xls'):
         xls = pd.ExcelFile(raw_file)
         for sheet_name in xls.sheet_names:
             dfs[sheet_name] = pd.read_excel(raw_file, sheet_name=sheet_name)
