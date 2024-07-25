@@ -79,7 +79,7 @@ def get_LLM(llm_type, user_api_key):
 
         return llm
     except Exception as e:
-        st.error("No/Incorrect API key provided! Please Provide/Verify your API key")
+        st.error(f"Error in getting LLM: {e}")
 
 def get_agent(data, llm):
     """
@@ -90,7 +90,6 @@ def get_agent(data, llm):
     Output: PandasAI Agent or None
     """
     if llm:
-        # Handle the case where llm is not MetaAI
         return Agent(list(data.values()), config={"llm": llm, "verbose": True, "response_parser": StreamlitResponse})
     return None
 
@@ -130,8 +129,7 @@ def chat_window(analyst, llm=None):
                 st.write(formatted_response)
                 st.session_state.messages.append({"role": "assistant", "response": formatted_response})
         except Exception as e:
-            st.write(e)
-            st.write("⚠️Sorry, Couldn't generate the answer! Please try rephrasing your question!")
+            st.write(f"⚠️ Sorry, Couldn't generate the answer! Please try rephrasing your question. Error: {e}")
 
     def clear_chat_history():
         st.session_state.messages = []
