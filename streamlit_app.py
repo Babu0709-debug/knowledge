@@ -12,9 +12,6 @@ import os
 # Load environment variables
 load_dotenv()
 
-# Initialize MetaAI (no API key required)
-meta_ai = MetaAI()
-
 # Dictionary to store the extracted dataframes
 data = {}
 
@@ -61,7 +58,7 @@ def main():
 def get_LLM(llm_type, user_api_key):
     try:
         if llm_type == 'MetaAI':
-            return meta_ai
+            return MetaAI()  # Assuming MetaAI is an instance of the LLM class or compatible
         elif llm_type == 'OpenAI':
             return OpenAI(api_token=user_api_key)
         elif llm_type == 'BambooLLM':
@@ -121,6 +118,10 @@ def chat_window(analyst):
 
 def get_agent(data, llm):
     try:
+        # Check if llm is an instance of the expected LLM class
+        if not isinstance(llm, (BambooLLM, OpenAI, MetaAI, ChatGoogleGenerativeAI)):
+            raise ValueError(f"llm is not an instance of the expected type: {type(llm)}")
+        
         config = {"llm": llm, "verbose": True, "response_parser": StreamlitResponse}
         st.write("Configuring agent with the following settings:", config)
         agent = Agent(list(data.values()), config=config)
