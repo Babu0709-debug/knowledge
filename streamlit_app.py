@@ -161,7 +161,7 @@ def meta_ai_chat_window():
         ai = MetaAI()
         try:
             response = ai.prompt(message=user_input)
-            print(response)  # Use st.write instead of print
+            st.write(response)  # Use st.write instead of print
             if response and response != "":
                 st.write(response.get('message', 'No response from Babu. Try again!'))
             else:
