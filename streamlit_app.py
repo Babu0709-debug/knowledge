@@ -15,6 +15,14 @@ load_dotenv()
 # Dictionary to store the extracted dataframes
 data = {}
 
+class MetaAIWrapper:
+    def __init__(self):
+        self.ai = MetaAI()
+    
+    def prompt(self, message):
+        response = self.ai.prompt(message=message)
+        return response['message']
+
 def main():
     st.set_page_config(page_title="FP&A", page_icon="🤖")
     st.title("Talk With Babu's Data")
@@ -58,21 +66,25 @@ def main():
 def get_LLM(llm_type, user_api_key):
     try:
         if llm_type == 'MetaAI':
-            return MetaAI()  # Assuming MetaAI is an instance of the LLM class or compatible
+            llm = MetaAIWrapper()
         elif llm_type == 'OpenAI':
-            return OpenAI(api_token=user_api_key)
+            llm = OpenAI(api_token=user_api_key)
         elif llm_type == 'BambooLLM':
             if user_api_key:
                 os.environ["PANDASAI_API_KEY"] = user_api_key
             else:
                 os.environ["PANDASAI_API_KEY"] = os.getenv('PANDASAI_API_KEY')
-            return BambooLLM()
+            llm = BambooLLM()
         elif llm_type == 'gemini-pro':
             if user_api_key:
                 genai.configure(api_key=user_api_key)
             else:
                 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
-            return ChatGoogleGenerativeAI(model="gemini-pro", temperature=0.3, google_api_key=user_api_key)
+            llm = ChatGoogleGenerativeAI(model="gemini-pro", temperature=0.3, google_api_key=user_api_key)
+        else:
+            st.error("Unsupported LLM type selected")
+            return None
+        return llm
     except Exception as e:
         st.error("No/Incorrect API key provided! Please Provide/Verify your API key")
         return None
@@ -119,7 +131,7 @@ def chat_window(analyst):
 def get_agent(data, llm):
     try:
         # Check if llm is an instance of the expected LLM class
-        if not isinstance(llm, (BambooLLM, OpenAI, MetaAI, ChatGoogleGenerativeAI)):
+        if not isinstance(llm, (BambooLLM, OpenAI, MetaAIWrapper, ChatGoogleGenerativeAI)):
             raise ValueError(f"llm is not an instance of the expected type: {type(llm)}")
         
         config = {"llm": llm, "verbose": True, "response_parser": StreamlitResponse}
