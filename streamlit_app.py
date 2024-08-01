@@ -8,12 +8,7 @@ from pandasai import Agent
 from pandasai.responses.streamlit_response import StreamlitResponse
 from meta_ai_api import MetaAI
 import os
-import speech_recognition as sr
-from streamlit_webrtc import webrtc_streamer, WebRtcMode, ClientSettings
 from streamlit_mic_recorder import mic_recorder, speech_to_text
-from pydub import AudioSegment
-import av
-import io
 
 # Load environment variables
 load_dotenv()
@@ -82,16 +77,11 @@ def get_LLM(llm_type, user_api_key):
         st.error(f"Error in getting LLM: {e}")
 
 def get_agent(data, llm):
-    """
-    The function creates an agent on the dataframes extracted from the uploaded files
-    Args: 
-        data: A Dictionary with the dataframes extracted from the uploaded data
-        llm:  LLM object based on the llm type selected
-    Output: PandasAI Agent or None
-    """
-    if llm:
+    try:
         return Agent(list(data.values()), config={"llm": llm, "verbose": True, "response_parser": StreamlitResponse})
-    return None
+    except Exception as e:
+        st.error(f"Error in agent configuration: {e}")
+        return None
 
 def chat_window(analyst, llm=None):
     with st.chat_message("assistant"):
@@ -144,29 +134,17 @@ def format_meta_ai_response(response):
     }
 
 def extract_dataframes(raw_file):
-    """
-    This function extracts dataframes from the uploaded file/files
-    Args: 
-        raw_file: Upload_File object
-    Processing: Based on the type of file read_csv or read_excel to extract the dataframes
-    Output: 
-        dfs:  a dictionary with the dataframes
-    """
     dfs = {}
     if raw_file.name.split('.')[1] == 'csv':
         csv_name = raw_file.name.split('.')[0]
         df = pd.read_csv(raw_file)
         dfs[csv_name] = df
 
-    elif (raw_file.name.split('.')[1] == 'xlsx') or (raw_file.name.split('.')[1] == 'xls'):
-        # Read the Excel file
+    elif raw_file.name.split('.')[1] in ['xlsx', 'xls']:
         xls = pd.ExcelFile(raw_file)
-
-        # Iterate through each sheet in the Excel file and store them into dataframes
         for sheet_name in xls.sheet_names:
             dfs[sheet_name] = pd.read_excel(raw_file, sheet_name=sheet_name)
 
-    # return the dataframes
     return dfs
 
 if __name__ == "__main__":
