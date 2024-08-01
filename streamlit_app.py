@@ -8,7 +8,12 @@ from pandasai import Agent
 from pandasai.responses.streamlit_response import StreamlitResponse
 from meta_ai_api import MetaAI
 import os
-from streamlit_mic_recorder import speech_to_text
+import speech_recognition as sr
+from streamlit_webrtc import webrtc_streamer, WebRtcMode, ClientSettings
+from streamlit_mic_recorder import mic_recorder, speech_to_text
+from pydub import AudioSegment
+import av
+import io
 
 # Load environment variables
 load_dotenv()
@@ -47,7 +52,7 @@ def main():
                 chat_window(analyst)
             else:
                 # Handle MetaAI directly
-                meta_ai_chat_window()
+                chat_window_meta_ai()
     else:
         st.warning("Please upload your data first! You can upload a CSV or an Excel file.")
 
@@ -77,11 +82,16 @@ def get_LLM(llm_type, user_api_key):
         st.error(f"Error in getting LLM: {e}")
 
 def get_agent(data, llm):
-    try:
+    """
+    The function creates an agent on the dataframes extracted from the uploaded files
+    Args: 
+        data: A Dictionary with the dataframes extracted from the uploaded data
+        llm:  LLM object based on the llm type selected
+    Output: PandasAI Agent or None
+    """
+    if llm:
         return Agent(list(data.values()), config={"llm": llm, "verbose": True, "response_parser": StreamlitResponse})
-    except Exception as e:
-        st.error(f"Error in agent configuration: {e}")
-        return None
+    return None
 
 def chat_window(analyst, llm=None):
     with st.chat_message("assistant"):
@@ -127,18 +137,6 @@ def chat_window(analyst, llm=None):
     st.sidebar.text("Click to Clear Chat history")
     st.sidebar.button("CLEAR 🗑️", on_click=clear_chat_history)
 
-def meta_ai_chat_window():
-    st.title("Chat with Babu")
-    user_input = st.text_input("Type your message:")
-    if st.button("Submit Your Request"):
-        ai = MetaAI()
-        response = ai.prompt(message=user_input)
-        print(response)
-        if response and response != "":
-            st.write(response['message'])
-        else:
-            st.write("No response from MetaAI. Try again!")
-
 def format_meta_ai_response(response):
     return {
         "message": response["message"],
@@ -146,18 +144,44 @@ def format_meta_ai_response(response):
     }
 
 def extract_dataframes(raw_file):
+    """
+    This function extracts dataframes from the uploaded file/files
+    Args: 
+        raw_file: Upload_File object
+    Processing: Based on the type of file read_csv or read_excel to extract the dataframes
+    Output: 
+        dfs:  a dictionary with the dataframes
+    """
     dfs = {}
     if raw_file.name.split('.')[1] == 'csv':
         csv_name = raw_file.name.split('.')[0]
         df = pd.read_csv(raw_file)
         dfs[csv_name] = df
 
-    elif raw_file.name.split('.')[1] in ['xlsx', 'xls']:
+    elif (raw_file.name.split('.')[1] == 'xlsx') or (raw_file.name.split('.')[1] == 'xls'):
+        # Read the Excel file
         xls = pd.ExcelFile(raw_file)
+
+        # Iterate through each sheet in the Excel file and store them into dataframes
         for sheet_name in xls.sheet_names:
             dfs[sheet_name] = pd.read_excel(raw_file, sheet_name=sheet_name)
 
+    # return the dataframes
     return dfs
+
+def chat_window_meta_ai():
+    st.title("Chat with Babu")
+    user_input = st.text_input("Type your message:")
+    if st.button("Submit Your Request"):
+        ai = MetaAI()
+        try:
+            response = ai.prompt(message=user_input)
+            if response and response != "":
+                st.write(response['message'])
+            else:
+                st.write("No response from. Try again!")
+        except Exception as e:
+            st.error(f"Error in MetaAI: {e}")
 
 if __name__ == "__main__":
     main()
