@@ -30,8 +30,11 @@ def main():
         # Selecting LLM to use
         llm_type = st.selectbox("Please select LLM", ('BambooLLM', 'gemini-pro', 'meta-ai', 'openai'), index=0)
 
-        # Adding user's API Key
-        user_api_key = st.text_input('Please commit', placeholder='Paste your API key here', type='password')
+        # Conditionally showing/hiding API Key input box
+        if llm_type != 'meta-ai':
+            user_api_key = st.text_input('Please commit', placeholder='Paste your API key here', type='password')
+        else:
+            user_api_key = None  # No API key needed for MetaAI
 
     if file_upload is not None:
         data = extract_dataframes(file_upload)
@@ -124,9 +127,8 @@ def chat_window(analyst):
                 if analyst:
                     # Handle non-MetaAI LLM
                     response = analyst.chat(user_question)
-                    formatted_response = response
-                    st.write(formatted_response)
-                    st.session_state.messages.append({"role": "assistant", "response": formatted_response})
+                    st.write(response)  # Use st.write instead of print
+                    st.session_state.messages.append({"role": "assistant", "response": response})
                 elif isinstance(analyst, openai):
                     # Handle OpenAI LLM
                     response = openai.Completion.create(
@@ -135,7 +137,7 @@ def chat_window(analyst):
                         max_tokens=150
                     )
                     formatted_response = response.choices[0].text.strip()
-                    st.write(formatted_response)
+                    st.write(formatted_response)  # Use st.write instead of print
                     st.session_state.messages.append({"role": "assistant", "response": formatted_response})
         except Exception as e:
             st.write(f"⚠️ Sorry, Couldn't generate the answer! Please try rephrasing your question. Error: {e}")
@@ -155,9 +157,9 @@ def meta_ai_chat_window():
         ai = MetaAI()
         try:
             response = ai.prompt(message=user_input)
-            st.write(response)
+            st.write(response)  # Use st.write instead of print
             if response and response != "":
-                st.write(response['message'])
+                st.write(response.get('message', 'No response from Meta AI. Try again!'))
             else:
                 st.write("No response from Meta AI. Try again!")
         except Exception as e:
