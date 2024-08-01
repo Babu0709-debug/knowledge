@@ -8,7 +8,7 @@ from pandasai import Agent
 from pandasai.responses.streamlit_response import StreamlitResponse
 from meta_ai_api import MetaAI
 import os
-from streamlit_mic_recorder import mic_recorder, speech_to_text
+from streamlit_mic_recorder import speech_to_text
 
 # Load environment variables
 load_dotenv()
@@ -47,7 +47,7 @@ def main():
                 chat_window(analyst)
             else:
                 # Handle MetaAI directly
-                chat_window(None, llm)
+                meta_ai_chat_window()
     else:
         st.warning("Please upload your data first! You can upload a CSV or an Excel file.")
 
@@ -126,6 +126,18 @@ def chat_window(analyst, llm=None):
 
     st.sidebar.text("Click to Clear Chat history")
     st.sidebar.button("CLEAR 🗑️", on_click=clear_chat_history)
+
+def meta_ai_chat_window():
+    st.title("Chat with Babu")
+    user_input = st.text_input("Type your message:")
+    if st.button("Submit Your Request"):
+        ai = MetaAI()
+        response = ai.prompt(message=user_input)
+        print(response)
+        if response and response != "":
+            st.write(response['message'])
+        else:
+            st.write("No response from MetaAI. Try again!")
 
 def format_meta_ai_response(response):
     return {
