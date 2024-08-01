@@ -8,6 +8,7 @@ from pandasai import Agent
 from pandasai.responses.streamlit_response import StreamlitResponse
 from meta_ai_api import MetaAI
 import os
+import openai
 
 # Load environment variables
 load_dotenv()
@@ -27,7 +28,7 @@ def main():
         st.markdown(":green[*Please ensure the first row has the column names.*]")
 
         # Selecting LLM to use
-        llm_type = st.selectbox("Please select LLM", ('BambooLLM', 'gemini-pro', 'meta-ai'), index=0)
+        llm_type = st.selectbox("Please select LLM", ('BambooLLM', 'gemini-pro', 'meta-ai', 'openai'), index=0)
 
         # Adding user's API Key
         user_api_key = st.text_input('Please commit', placeholder='Paste your API key here', type='password')
@@ -67,6 +68,14 @@ def get_LLM(llm_type, user_api_key):
                 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
             llm = ChatGoogleGenerativeAI(model="gemini-pro", temperature=0.3, google_api_key=user_api_key)
+
+        elif llm_type == 'openai':
+            if user_api_key:
+                openai.api_key = user_api_key
+            else:
+                openai.api_key = os.getenv("OPENAI_API_KEY")
+
+            llm = openai
 
         elif llm_type == 'meta-ai':
             llm = MetaAI()  # Meta AI does not require an API key
@@ -116,6 +125,16 @@ def chat_window(analyst):
                     # Handle non-MetaAI LLM
                     response = analyst.chat(user_question)
                     formatted_response = response
+                    st.write(formatted_response)
+                    st.session_state.messages.append({"role": "assistant", "response": formatted_response})
+                elif isinstance(analyst, openai):
+                    # Handle OpenAI LLM
+                    response = openai.Completion.create(
+                        engine="text-davinci-003",
+                        prompt=user_question,
+                        max_tokens=150
+                    )
+                    formatted_response = response.choices[0].text.strip()
                     st.write(formatted_response)
                     st.session_state.messages.append({"role": "assistant", "response": formatted_response})
         except Exception as e:
