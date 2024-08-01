@@ -155,7 +155,7 @@ def meta_ai_chat_window():
         ai = MetaAI()
         try:
             response = ai.prompt(message=user_input)
-             st.write(response)
+            st.write(response)
             if response and response != "":
                 st.write(response['message'])
             else:
