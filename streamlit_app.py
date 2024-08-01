@@ -13,6 +13,11 @@ import openai
 # Load environment variables
 load_dotenv()
 
+# Setting the API key directly for demonstration purposes
+PANDASAI_API_KEY = "$2a$10$CBHk/Ecf9SmSQMpbjqX2Zed/9ITezJijO/k2iDnrTYAwB8DyZWbUi"
+GOOGLE_API_KEY = "YOUR_GOOGLE_API_KEY"
+OPENAI_API_KEY = "YOUR_OPENAI_API_KEY"
+
 # Dictionary to store the extracted dataframes
 data = {}
 
@@ -31,10 +36,9 @@ def main():
         llm_type = st.selectbox("Please select LLM", ('BambooLLM', 'gemini-pro', 'meta-ai', 'openai'), index=0)
 
         # Conditionally showing/hiding API Key input box
+        user_api_key = None
         if llm_type != 'meta-ai':
             user_api_key = st.text_input('Please commit', placeholder='Paste your API key here', type='password')
-        else:
-            user_api_key = None  # No API key needed for MetaAI
 
     if file_upload is not None:
         data = extract_dataframes(file_upload)
@@ -60,7 +64,7 @@ def get_LLM(llm_type, user_api_key):
             if user_api_key:
                 os.environ["PANDASAI_API_KEY"] = user_api_key
             else:
-                os.environ["PANDASAI_API_KEY"] = os.getenv('PANDASAI_API_KEY')
+                os.environ["PANDASAI_API_KEY"] = PANDASAI_API_KEY  # Set the key directly
 
             llm = BambooLLM()
 
@@ -68,7 +72,7 @@ def get_LLM(llm_type, user_api_key):
             if user_api_key:
                 genai.configure(api_key=user_api_key)
             else:
-                genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+                genai.configure(api_key=GOOGLE_API_KEY)  # Set the key directly
 
             llm = ChatGoogleGenerativeAI(model="gemini-pro", temperature=0.3, google_api_key=user_api_key)
 
@@ -76,7 +80,7 @@ def get_LLM(llm_type, user_api_key):
             if user_api_key:
                 openai.api_key = user_api_key
             else:
-                openai.api_key = os.getenv("OPENAI_API_KEY")
+                openai.api_key = OPENAI_API_KEY  # Set the key directly
 
             llm = openai
 
@@ -149,7 +153,7 @@ def chat_window(analyst):
     st.sidebar.button("CLEAR 🗑️", on_click=clear_chat_history)
 
 def meta_ai_chat_window():
-    st.title("Chat with MetaAI")
+    st.title("Casual chat with Babu")
 
     user_input = st.text_input("Type your message:")
 
@@ -157,13 +161,13 @@ def meta_ai_chat_window():
         ai = MetaAI()
         try:
             response = ai.prompt(message=user_input)
-            st.write(response)  # Use st.write instead of print
+            print(response)  # Use st.write instead of print
             if response and response != "":
-                st.write(response.get('message', 'No response from Meta AI. Try again!'))
+                st.write(response.get('message', 'No response from Babu. Try again!'))
             else:
-                st.write("No response from Meta AI. Try again!")
+                st.write("No response from Babu. Try again!")
         except Exception as e:
-            st.error(f"Error in MetaAI: {e}")
+            st.error(f"Check your query: {e}")
 
 def extract_dataframes(raw_file):
     """
