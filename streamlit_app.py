@@ -5,8 +5,7 @@ import google.generativeai as genai
 from meta_ai_api import MetaAI
 from pandasai import Agent
 from pandasai.responses.streamlit_response import StreamlitResponse
-from pandasai.llm import BambooLLM
-from pandasai.llm.openai import OpenAI
+from pandasai.llm import BambooLLM, OpenAI
 from dotenv import load_dotenv
 import os
 
@@ -48,10 +47,12 @@ def main():
         
         if llm:
             # Instantiating PandasAI agent
-            analyst = get_agent(data, llm)
-            
-            # Starting the chat with the PandasAI agent
-            chat_window(analyst)
+            try:
+                analyst = get_agent(data, llm)
+                # Starting the chat with the PandasAI agent
+                chat_window(analyst)
+            except Exception as e:
+                st.error(f"Failed to initialize agent: {e}")
     
     else:
         st.warning("Please upload your data first! You can upload a CSV or an Excel file.")
@@ -119,8 +120,14 @@ def chat_window(analyst):
     st.sidebar.button("CLEAR 🗑️", on_click=clear_chat_history)
 
 def get_agent(data, llm):
-    agent = Agent(list(data.values()), config={"llm": llm, "verbose": True, "response_parser": StreamlitResponse})
-    return agent
+    try:
+        config = {"llm": llm, "verbose": True, "response_parser": StreamlitResponse}
+        st.write("Configuring agent with the following settings:", config)
+        agent = Agent(list(data.values()), config=config)
+        return agent
+    except Exception as e:
+        st.error(f"Error in agent configuration: {e}")
+        raise e
 
 def extract_dataframes(raw_file):
     dfs = {}
