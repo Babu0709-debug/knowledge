@@ -8,12 +8,6 @@ from pandasai import Agent
 from pandasai.responses.streamlit_response import StreamlitResponse
 from meta_ai_api import MetaAI
 import os
-import speech_recognition as sr
-from streamlit_webrtc import webrtc_streamer, WebRtcMode, ClientSettings
-from streamlit_mic_recorder import mic_recorder, speech_to_text
-from pydub import AudioSegment
-import av
-import io
 
 # Load environment variables
 load_dotenv()
@@ -51,8 +45,8 @@ def main():
                 analyst = get_agent(data, llm)
                 chat_window(analyst)
             else:
-                # Handle MetaAI directly
-                chat_window_meta_ai()
+                # Handle MetaAI directly for general conversations
+                meta_ai_chat_window()
     else:
         st.warning("Please upload your data first! You can upload a CSV or an Excel file.")
 
@@ -93,7 +87,7 @@ def get_agent(data, llm):
         return Agent(list(data.values()), config={"llm": llm, "verbose": True, "response_parser": StreamlitResponse})
     return None
 
-def chat_window(analyst, llm=None):
+def chat_window(analyst):
     with st.chat_message("assistant"):
         st.text("Explore Babu's Data")
 
@@ -109,7 +103,7 @@ def chat_window(analyst, llm=None):
             elif 'error' in message:
                 st.text(message['error'])
 
-    user_question = st.text_input("Enter your question here", value=speech_to_text(language='en'))
+    user_question = st.text_input("Enter your question here")
 
     if user_question:
         with st.chat_message("user"):
@@ -122,12 +116,8 @@ def chat_window(analyst, llm=None):
                     # Handle non-MetaAI LLM
                     response = analyst.chat(user_question)
                     formatted_response = response
-                elif llm:
-                    # Handle MetaAI LLM
-                    response = llm.prompt(message=user_question, stream=False)
-                    formatted_response = format_meta_ai_response(response)
-                st.write(formatted_response)
-                st.session_state.messages.append({"role": "assistant", "response": formatted_response})
+                    st.write(formatted_response)
+                    st.session_state.messages.append({"role": "assistant", "response": formatted_response})
         except Exception as e:
             st.write(f"⚠️ Sorry, Couldn't generate the answer! Please try rephrasing your question. Error: {e}")
 
@@ -137,11 +127,22 @@ def chat_window(analyst, llm=None):
     st.sidebar.text("Click to Clear Chat history")
     st.sidebar.button("CLEAR 🗑️", on_click=clear_chat_history)
 
-def format_meta_ai_response(response):
-    return {
-        "message": response["message"],
-        "sources": response.get("sources", [])
-    }
+def meta_ai_chat_window():
+    st.title("Chat with MetaAI")
+
+    user_input = st.text_input("Type your message:")
+
+    if st.button("Submit Your Request"):
+        ai = MetaAI()
+        try:
+            response = ai.prompt(message=user_input)
+            print(response)
+            if response and response != "":
+                st.write(response['message'])
+            else:
+                st.write("No response from Meta AI. Try again!")
+        except Exception as e:
+            st.error(f"Error in MetaAI: {e}")
 
 def extract_dataframes(raw_file):
     """
@@ -168,20 +169,6 @@ def extract_dataframes(raw_file):
 
     # return the dataframes
     return dfs
-
-def chat_window_meta_ai():
-    st.title("Chat with Babu")
-    user_input = st.text_input("Type your message:")
-    if st.button("Submit Your Request"):
-        ai = MetaAI()
-        try:
-            response = ai.prompt(message=user_input)
-            if response and response != "":
-                st.write(response['message'])
-            else:
-                st.write("No response from. Try again!")
-        except Exception as e:
-            st.error(f"Error in MetaAI: {e}")
 
 if __name__ == "__main__":
     main()
