@@ -12,6 +12,7 @@ import os
 import tiktoken
 import pyodbc
 import warnings
+import time
 
 warnings.filterwarnings('ignore')
 
@@ -41,31 +42,9 @@ def generate_openai_response(input_text, openai_api_key):
     except Exception as e:
         st.error(f"An error occurred: {str(e)}")
 
-@st.cache_resource
-def init_connection():
-    return pyodbc.connect(
-        "DRIVER={ODBC Driver 17 for SQL Server};SERVER="
-        + st.secrets["server"]
-        + ";DATABASE="
-        + st.secrets["database"]
-        + ";UID="
-        + st.secrets["username"]
-        + ";PWD="
-        + st.secrets["password"]
-    )
-
-@st.cache_data(ttl=600)
-def run_query(query):
-    with conn.cursor() as cur:
-        cur.execute(query)
-        return cur.fetchall()
-
 def main():
     st.set_page_config(page_title="Data Analysis with LLMs", page_icon="📊")
     st.title("Data Analysis with LLMs")
-
-    # Initialize SQL connection
-    conn = init_connection()
 
     # Side Menu Bar
     with st.sidebar:
@@ -73,7 +52,9 @@ def main():
         st.text("Data Setup: 📝")
 
         st.subheader("SQL Server Connection")
-        query = st.text_area("SQL Query", "SELECT * FROM mytable;")
+        server_name = st.text_input("Server Name", "10.232.70.46")
+        database_name = st.text_input("Database Name", "Ods_live")
+        query = st.text_area("SQL Query", "Select top 10 * from EMOS.Sales_Invoiced")
 
         # Selecting LLM to use
         llm_type = st.selectbox("Please select LLM", ('BambooLLM', 'gemini-pro', 'meta-ai', 'openai'), index=0)
@@ -82,26 +63,49 @@ def main():
         if llm_type != 'meta-ai':
             user_api_key = st.text_input('Please commit', placeholder='Paste your API key here', type='password')
 
-    if query:
+    if server_name and database_name and query:
         try:
-            rows = run_query(query)
-            df = pd.DataFrame(rows, columns=[desc[0] for desc in conn.cursor().description])
-            data['SQL_Query_Result'] = df
-            st.success("Successfully fetched data from SQL Server")
-            st.dataframe(df)
+            conn_str = (
+                f"DRIVER={{ODBC Driver 17 for SQL Server}};"
+                f"SERVER={server_name};"
+                f"DATABASE={database_name};"
+                f"Trusted_Connection=yes;"
+                f"Connection Timeout=30;"
+            )
 
-            llm = get_LLM(llm_type, user_api_key if llm_type != 'meta-ai' else None)
+            max_retries = 3
+            retry_delay = 5
+            conn = None
 
-            if llm:
-                if llm_type != 'meta-ai' and llm_type != 'openai':
-                    # Instantiating PandasAI agent if not using MetaAI or OpenAI
-                    analyst = get_agent(data, llm)
-                    chat_window(analyst)
-                elif llm_type == 'meta-ai':
-                    # Handle MetaAI directly
-                    chat_window(None, llm)
-                elif llm_type == 'openai':
-                    openai_chat_window(df, user_api_key)
+            for attempt in range(max_retries):
+                try:
+                    conn = pyodbc.connect(conn_str)
+                    break
+                except Exception as e:
+                    st.error(f"Attempt {attempt + 1} failed: {e}")
+                    if attempt < max_retries - 1:
+                        time.sleep(retry_delay)
+                    else:
+                        raise
+
+            if conn:
+                df = pd.read_sql_query(query, conn)
+                data['SQL_Query_Result'] = df
+                st.success("Successfully fetched data from SQL Server")
+                st.dataframe(df)
+
+                llm = get_LLM(llm_type, user_api_key if llm_type != 'meta-ai' else None)
+
+                if llm:
+                    if llm_type != 'meta-ai' and llm_type != 'openai':
+                        # Instantiating PandasAI agent if not using MetaAI or OpenAI
+                        analyst = get_agent(data, llm)
+                        chat_window(analyst)
+                    elif llm_type == 'meta-ai':
+                        # Handle MetaAI directly
+                        chat_window(None, llm)
+                    elif llm_type == 'openai':
+                        openai_chat_window(df, user_api_key)
 
         except Exception as e:
             st.error(f"Failed to connect to SQL Server: {e}")
@@ -245,17 +249,6 @@ def extract_dataframes(raw_file):
 
     # return the dataframes
     return dfs
-
-def openai_chat_window(df, openai_api_key):
-    user_question = st.text_area("Ask a question to OpenAI")
-
-    if st.button("Generate Response"):
-        if not user_question:
-            st.error("Please enter a question.")
-        elif not openai_api_key:
-            st.error("Please enter your OpenAI API key.")
-        else:
-            generate_openai_response(user_question, openai_api_key)
 
 if __name__ == "__main__":
     main()
