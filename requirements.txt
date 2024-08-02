@@ -34,3 +34,4 @@ whisper
 tiktoken
 langchain
 meta_ai_api
+pyodbc
