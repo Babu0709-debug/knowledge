@@ -7,56 +7,108 @@ from pandasai.llm import BambooLLM
 from pandasai import Agent
 from pandasai.responses.streamlit_response import StreamlitResponse
 from meta_ai_api import MetaAI
-import os
 import openai
+import os
+import tiktoken
+import pyodbc  # Import pyodbc for SQL Server connection
+import warnings
+
+warnings.filterwarnings('ignore')
 
 # Load environment variables
 load_dotenv()
 
-# Setting the API key directly for demonstration purposes
-PANDASAI_API_KEY = "$2a$10$CBHk/Ecf9SmSQMpbjqX2Zed/9ITezJijO/k2iDnrTYAwB8DyZWbUi"
-GOOGLE_API_KEY = "YOUR_GOOGLE_API_KEY"
-OPENAI_API_KEY = "YOUR_OPENAI_API_KEY"
-
 # Dictionary to store the extracted dataframes
 data = {}
 
+def count_tokens(string: str) -> int:
+    encoding_name = "p50k_base"
+    encoding = tiktoken.get_encoding(encoding_name)
+    num_tokens = len(encoding.encode(string))
+    return num_tokens
+
+def generate_openai_response(input_text, openai_api_key):
+    try:
+        openai.api_key = openai_api_key
+        response = openai.Completion.create(
+            engine="text-davinci-003",
+            prompt=input_text,
+            max_tokens=150
+        )
+        num_tokens = count_tokens(input_text)
+        st.info(f"Input contains {num_tokens} tokens.")
+        st.info(response.choices[0].text.strip())
+    except Exception as e:
+        st.error(f"An error occurred: {str(e)}")
+
 def main():
-    st.set_page_config(page_title="FP&A", page_icon="🤖")
-    st.title("Talk With Babu's Data")
+    st.set_page_config(page_title="Data Analysis with LLMs", page_icon="📊")
+    st.title("Data Analysis with LLMs")
 
     # Side Menu Bar
     with st.sidebar:
         st.title("FP&A Analysis")
         st.text("Data Setup: 📝")
-        file_upload = st.file_uploader("Upload your Data", accept_multiple_files=False, type=['csv', 'xls', 'xlsx'])
-        st.markdown(":green[*Please ensure the first row has the column names.*]")
+
+        st.subheader("SQL Server Connection")
+        server_name = st.text_input("Server Name", "10.232.70.46")
+        database_name = st.text_input("Database Name", "Ods_live")
+        query = st.text_area("SQL Query", "Select top 10 * from EMOS.Sales_Invoiced")
 
         # Selecting LLM to use
         llm_type = st.selectbox("Please select LLM", ('BambooLLM', 'gemini-pro', 'meta-ai', 'openai'), index=0)
 
-        # Conditionally showing/hiding API Key input box
-        user_api_key = None
+        # Adding user's API Key
         if llm_type != 'meta-ai':
             user_api_key = st.text_input('Please commit', placeholder='Paste your API key here', type='password')
 
-    if file_upload is not None:
-        data = extract_dataframes(file_upload)
-        df = st.selectbox("Here's your uploaded data!", tuple(data.keys()), index=0)
-        st.dataframe(data[df])
+    if server_name and database_name and query:
+        try:
+            conn_str = f"DRIVER={{SQL Server}};SERVER={server_name};DATABASE={database_name};Trusted_Connection=yes;"
+            conn = pyodbc.connect(conn_str)
+            df = pd.read_sql_query(query, conn)
+            data['SQL_Query_Result'] = df
+            st.success("Successfully fetched data from SQL Server")
+            st.dataframe(df)
 
-        llm = get_LLM(llm_type, user_api_key)
+            llm = get_LLM(llm_type, user_api_key if llm_type != 'meta-ai' else None)
 
-        if llm:
-            if llm_type != 'meta-ai':
-                # Instantiating PandasAI agent if not using MetaAI
-                analyst = get_agent(data, llm)
-                chat_window(analyst)
-            else:
-                # Handle MetaAI directly for general conversations
-                meta_ai_chat_window()
+            if llm:
+                if llm_type != 'meta-ai' and llm_type != 'openai':
+                    # Instantiating PandasAI agent if not using MetaAI or OpenAI
+                    analyst = get_agent(data, llm)
+                    chat_window(analyst)
+                elif llm_type == 'meta-ai':
+                    # Handle MetaAI directly
+                    chat_window(None, llm)
+                elif llm_type == 'openai':
+                    openai_chat_window(df, user_api_key)
+
+        except Exception as e:
+            st.error(f"Failed to connect to SQL Server: {e}")
     else:
-        st.warning("Please upload your data first! You can upload a CSV or an Excel file.")
+        file_upload = st.file_uploader("Upload your Data", accept_multiple_files=False, type=['csv', 'xls', 'xlsx'])
+        st.markdown(":green[*Please ensure the first row has the column names.*]")
+
+        if file_upload is not None:
+            data.update(extract_dataframes(file_upload))
+            df = st.selectbox("Here's your uploaded data!", tuple(data.keys()), index=0)
+            st.dataframe(data[df])
+
+            llm = get_LLM(llm_type, user_api_key if llm_type != 'meta-ai' else None)
+
+            if llm:
+                if llm_type != 'meta-ai' and llm_type != 'openai':
+                    # Instantiating PandasAI agent if not using MetaAI or OpenAI
+                    analyst = get_agent(data, llm)
+                    chat_window(analyst)
+                elif llm_type == 'meta-ai':
+                    # Handle MetaAI directly
+                    chat_window(None, llm)
+                elif llm_type == 'openai':
+                    openai_chat_window(data[df], user_api_key)
+        else:
+            st.warning("Please upload your data first! You can upload a CSV or an Excel file.")
 
 def get_LLM(llm_type, user_api_key):
     try:
@@ -64,7 +116,7 @@ def get_LLM(llm_type, user_api_key):
             if user_api_key:
                 os.environ["PANDASAI_API_KEY"] = user_api_key
             else:
-                os.environ["PANDASAI_API_KEY"] = PANDASAI_API_KEY  # Set the key directly
+                os.environ["PANDASAI_API_KEY"] = os.getenv('PANDASAI_API_KEY')
 
             llm = BambooLLM()
 
@@ -72,20 +124,16 @@ def get_LLM(llm_type, user_api_key):
             if user_api_key:
                 genai.configure(api_key=user_api_key)
             else:
-                genai.configure(api_key=GOOGLE_API_KEY)  # Set the key directly
+                genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
             llm = ChatGoogleGenerativeAI(model="gemini-pro", temperature=0.3, google_api_key=user_api_key)
 
-        elif llm_type == 'openai':
-            if user_api_key:
-                openai.api_key = user_api_key
-            else:
-                openai.api_key = OPENAI_API_KEY  # Set the key directly
-
-            llm = openai
-
         elif llm_type == 'meta-ai':
             llm = MetaAI()  # Meta AI does not require an API key
+
+        elif llm_type == 'openai':
+            # For OpenAI, no need to instantiate the class as it is handled in the generate_openai_response function
+            llm = "openai"
 
         return llm
     except Exception as e:
@@ -103,7 +151,7 @@ def get_agent(data, llm):
         return Agent(list(data.values()), config={"llm": llm, "verbose": True, "response_parser": StreamlitResponse})
     return None
 
-def chat_window(analyst):
+def chat_window(analyst, llm=None):
     with st.chat_message("assistant"):
         st.text("Explore Babu's Data")
 
@@ -131,18 +179,13 @@ def chat_window(analyst):
                 if analyst:
                     # Handle non-MetaAI LLM
                     response = analyst.chat(user_question)
-                    st.write(response)  # Use st.write instead of print
-                    st.session_state.messages.append({"role": "assistant", "response": response})
-                elif isinstance(analyst, openai):
-                    # Handle OpenAI LLM
-                    response = openai.Completion.create(
-                        engine="text-davinci-003",
-                        prompt=user_question,
-                        max_tokens=150
-                    )
-                    formatted_response = response.choices[0].text.strip()
-                    st.write(formatted_response)  # Use st.write instead of print
-                    st.session_state.messages.append({"role": "assistant", "response": formatted_response})
+                    formatted_response = response
+                elif llm:
+                    # Handle MetaAI LLM
+                    response = llm.prompt(message=user_question, stream=False)
+                    formatted_response = format_meta_ai_response(response)
+                st.write(formatted_response)
+                st.session_state.messages.append({"role": "assistant", "response": formatted_response})
         except Exception as e:
             st.write(f"⚠️ Sorry, Couldn't generate the answer! Please try rephrasing your question. Error: {e}")
 
@@ -152,22 +195,11 @@ def chat_window(analyst):
     st.sidebar.text("Click to Clear Chat history")
     st.sidebar.button("CLEAR 🗑️", on_click=clear_chat_history)
 
-def meta_ai_chat_window():
-    st.title("Casual chat with Babu")
-
-    user_input = st.text_input("Type your message:")
-
-    if st.button("Submit Your Request"):
-        ai = MetaAI()
-        try:
-            response = ai.prompt(message=user_input)
-            st.write(response)  # Use st.write instead of print
-            if response and response != "":
-                st.write(response.get('message', 'No response from Babu. Try again!'))
-            else:
-                st.write("No response from Babu. Try again!")
-        except Exception as e:
-            st.error(f"Check your query: {e}")
+def format_meta_ai_response(response):
+    return {
+        "message": response["message"],
+        "sources": response.get("sources", [])
+    }
 
 def extract_dataframes(raw_file):
     """
@@ -194,6 +226,21 @@ def extract_dataframes(raw_file):
 
     # return the dataframes
     return dfs
+
+def openai_chat_window(df, openai_api_key):
+    column_data = df.to_string(index=False)
+    #st.text_area("Data", column_data, height=150)
+
+    with st.form('openai_form'):
+        question = st.text_area('Enter your question about the data:', '')
+        submitted = st.form_submit_button('Submit')
+
+        if submitted:
+            if openai_api_key.startswith('sk-'):
+                prompt = f"Analyze the following data:\n\n{column_data}\n\n{question}"
+                generate_openai_response(prompt, openai_api_key)
+            else:
+                st.warning('Please enter a valid OpenAI API key!', icon='⚠️')
 
 if __name__ == "__main__":
     main()
