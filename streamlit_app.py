@@ -10,14 +10,10 @@ from meta_ai_api import MetaAI
 import openai
 import os
 import tiktoken
-import pyodbc  # Import pyodbc for SQL Server connection
+import pyodbc
 import warnings
-import subprocess
 
 warnings.filterwarnings('ignore')
-
-# Install ODBC Driver 17 for SQL Server
-subprocess.run(["sudo", "apt-get", "install", "unixodbc-dev", "msodbcsql17"], check=True)
 
 # Load environment variables
 load_dotenv()
