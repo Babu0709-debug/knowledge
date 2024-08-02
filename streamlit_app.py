@@ -12,6 +12,7 @@ import os
 import tiktoken
 import pyodbc
 import warnings
+import time
 
 warnings.filterwarnings('ignore')
 
@@ -64,25 +65,47 @@ def main():
 
     if server_name and database_name and query:
         try:
-            conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={server_name};DATABASE={database_name};Trusted_Connection=yes;"
-            conn = pyodbc.connect(conn_str)
-            df = pd.read_sql_query(query, conn)
-            data['SQL_Query_Result'] = df
-            st.success("Successfully fetched data from SQL Server")
-            st.dataframe(df)
+            conn_str = (
+                f"DRIVER={{ODBC Driver 17 for SQL Server}};"
+                f"SERVER={server_name};"
+                f"DATABASE={database_name};"
+                f"Trusted_Connection=yes;"
+                f"Connection Timeout=30;"
+            )
 
-            llm = get_LLM(llm_type, user_api_key if llm_type != 'meta-ai' else None)
+            max_retries = 3
+            retry_delay = 5
+            conn = None
 
-            if llm:
-                if llm_type != 'meta-ai' and llm_type != 'openai':
-                    # Instantiating PandasAI agent if not using MetaAI or OpenAI
-                    analyst = get_agent(data, llm)
-                    chat_window(analyst)
-                elif llm_type == 'meta-ai':
-                    # Handle MetaAI directly
-                    chat_window(None, llm)
-                elif llm_type == 'openai':
-                    openai_chat_window(df, user_api_key)
+            for attempt in range(max_retries):
+                try:
+                    conn = pyodbc.connect(conn_str)
+                    break
+                except Exception as e:
+                    st.error(f"Attempt {attempt + 1} failed: {e}")
+                    if attempt < max_retries - 1:
+                        time.sleep(retry_delay)
+                    else:
+                        raise
+
+            if conn:
+                df = pd.read_sql_query(query, conn)
+                data['SQL_Query_Result'] = df
+                st.success("Successfully fetched data from SQL Server")
+                st.dataframe(df)
+
+                llm = get_LLM(llm_type, user_api_key if llm_type != 'meta-ai' else None)
+
+                if llm:
+                    if llm_type != 'meta-ai' and llm_type != 'openai':
+                        # Instantiating PandasAI agent if not using MetaAI or OpenAI
+                        analyst = get_agent(data, llm)
+                        chat_window(analyst)
+                    elif llm_type == 'meta-ai':
+                        # Handle MetaAI directly
+                        chat_window(None, llm)
+                    elif llm_type == 'openai':
+                        openai_chat_window(df, user_api_key)
 
         except Exception as e:
             st.error(f"Failed to connect to SQL Server: {e}")
@@ -226,21 +249,6 @@ def extract_dataframes(raw_file):
 
     # return the dataframes
     return dfs
-
-def openai_chat_window(df, openai_api_key):
-    column_data = df.to_string(index=False)
-    #st.text_area("Data", column_data, height=150)
-
-    with st.form('openai_form'):
-        question = st.text_area('Enter your question about the data:', '')
-        submitted = st.form_submit_button('Submit')
-
-        if submitted:
-            if openai_api_key.startswith('sk-'):
-                prompt = f"Analyze the following data:\n\n{column_data}\n\n{question}"
-                generate_openai_response(prompt, openai_api_key)
-            else:
-                st.warning('Please enter a valid OpenAI API key!', icon='⚠️')
 
 if __name__ == "__main__":
     main()
