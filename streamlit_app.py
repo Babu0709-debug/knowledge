@@ -12,8 +12,12 @@ import os
 import tiktoken
 import pyodbc  # Import pyodbc for SQL Server connection
 import warnings
+import subprocess
 
 warnings.filterwarnings('ignore')
+
+# Install ODBC Driver 17 for SQL Server
+subprocess.run(["sudo", "apt-get", "install", "unixodbc-dev", "msodbcsql17"], check=True)
 
 # Load environment variables
 load_dotenv()
@@ -64,7 +68,7 @@ def main():
 
     if server_name and database_name and query:
         try:
-            conn_str = f"DRIVER={{SQL Server}};SERVER={server_name};DATABASE={database_name};Trusted_Connection=yes;"
+            conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={server_name};DATABASE={database_name};Trusted_Connection=yes;"
             conn = pyodbc.connect(conn_str)
             df = pd.read_sql_query(query, conn)
             data['SQL_Query_Result'] = df
