@@ -12,7 +12,6 @@ import os
 import tiktoken
 import pyodbc
 import warnings
-import time
 
 warnings.filterwarnings('ignore')
 
@@ -51,10 +50,18 @@ def main():
         st.title("FP&A Analysis")
         st.text("Data Setup: 📝")
 
-        st.subheader("SQL Server Connection")
-        server_name = st.text_input("Server Name", "10.232.70.46")
-        database_name = st.text_input("Database Name", "Ods_live")
-        query = st.text_area("SQL Query", "Select top 10 * from EMOS.Sales_Invoiced")
+        # Selection Dropdown for Data Source
+        data_source = st.selectbox("Select Data Source", ["SQL", "Excel"], index=0)
+
+        if data_source == "SQL":
+            st.subheader("SQL Server Connection")
+            server_name = st.text_input("Server Name", "10.232.70.46")
+            database_name = st.text_input("Database Name", "Ods_live")
+            query = st.text_area("SQL Query", "Select top 10 * from EMOS.Sales_Invoiced")
+
+        else:
+            file_upload = st.file_uploader("Upload your Data", accept_multiple_files=False, type=['csv', 'xls', 'xlsx'])
+            st.markdown(":green[*Please ensure the first row has the column names.*]")
 
         # Selecting LLM to use
         llm_type = st.selectbox("Please select LLM", ('BambooLLM', 'gemini-pro', 'meta-ai', 'openai'), index=0)
@@ -63,60 +70,14 @@ def main():
         if llm_type != 'meta-ai':
             user_api_key = st.text_input('Please commit', placeholder='Paste your API key here', type='password')
 
-    if server_name and database_name and query:
+    if data_source == "SQL" and server_name and database_name and query:
         try:
-            conn_str = (
-                f"DRIVER={{ODBC Driver 17 for SQL Server}};"
-                f"SERVER={server_name};"
-                f"DATABASE={database_name};"
-                f"Trusted_Connection=yes;"
-                f"Connection Timeout=30;"
-            )
-
-            max_retries = 3
-            retry_delay = 5
-            conn = None
-
-            for attempt in range(max_retries):
-                try:
-                    conn = pyodbc.connect(conn_str)
-                    break
-                except Exception as e:
-                    st.error(f"Attempt {attempt + 1} failed: {e}")
-                    if attempt < max_retries - 1:
-                        time.sleep(retry_delay)
-                    else:
-                        raise
-
-            if conn:
-                df = pd.read_sql_query(query, conn)
-                data['SQL_Query_Result'] = df
-                st.success("Successfully fetched data from SQL Server")
-                st.dataframe(df)
-
-                llm = get_LLM(llm_type, user_api_key if llm_type != 'meta-ai' else None)
-
-                if llm:
-                    if llm_type != 'meta-ai' and llm_type != 'openai':
-                        # Instantiating PandasAI agent if not using MetaAI or OpenAI
-                        analyst = get_agent(data, llm)
-                        chat_window(analyst)
-                    elif llm_type == 'meta-ai':
-                        # Handle MetaAI directly
-                        chat_window(None, llm)
-                    elif llm_type == 'openai':
-                        openai_chat_window(df, user_api_key)
-
-        except Exception as e:
-            st.error(f"Failed to connect to SQL Server: {e}")
-    else:
-        file_upload = st.file_uploader("Upload your Data", accept_multiple_files=False, type=['csv', 'xls', 'xlsx'])
-        st.markdown(":green[*Please ensure the first row has the column names.*]")
-
-        if file_upload is not None:
-            data.update(extract_dataframes(file_upload))
-            df = st.selectbox("Here's your uploaded data!", tuple(data.keys()), index=0)
-            st.dataframe(data[df])
+            conn_str = f"DRIVER={{SQL Server}};SERVER={server_name};DATABASE={database_name};Trusted_Connection=yes;"
+            conn = pyodbc.connect(conn_str)
+            df = pd.read_sql_query(query, conn)
+            data['SQL_Query_Result'] = df
+            st.success("Successfully fetched data from SQL Server")
+            st.dataframe(df)
 
             llm = get_LLM(llm_type, user_api_key if llm_type != 'meta-ai' else None)
 
@@ -129,9 +90,30 @@ def main():
                     # Handle MetaAI directly
                     chat_window(None, llm)
                 elif llm_type == 'openai':
-                    openai_chat_window(data[df], user_api_key)
-        else:
-            st.warning("Please upload your data first! You can upload a CSV or an Excel file.")
+                    openai_chat_window(df, user_api_key)
+
+        except Exception as e:
+            st.error(f"Failed to connect to SQL Server: {e}")
+
+    elif data_source == "Excel" and file_upload is not None:
+        data.update(extract_dataframes(file_upload))
+        df = st.selectbox("Here's your uploaded data!", tuple(data.keys()), index=0)
+        st.dataframe(data[df])
+
+        llm = get_LLM(llm_type, user_api_key if llm_type != 'meta-ai' else None)
+
+        if llm:
+            if llm_type != 'meta-ai' and llm_type != 'openai':
+                # Instantiating PandasAI agent if not using MetaAI or OpenAI
+                analyst = get_agent(data, llm)
+                chat_window(analyst)
+            elif llm_type == 'meta-ai':
+                # Handle MetaAI directly
+                chat_window(None, llm)
+            elif llm_type == 'openai':
+                openai_chat_window(data[df], user_api_key)
+    else:
+        st.warning("Please provide the required inputs.")
 
 def get_LLM(llm_type, user_api_key):
     try:
@@ -186,7 +168,10 @@ def chat_window(analyst, llm=None):
             if 'question' in message:
                 st.markdown(message["question"])
             elif 'response' in message:
-                st.write(message['response'])
+                if message["role"] == "assistant" and llm == "meta-ai":
+                    st.markdown(f'<div style="color:white;">{message["response"]}</div>', unsafe_allow_html=True)
+                else:
+                    st.write(message["response"])
             elif 'error' in message:
                 st.text(message['error'])
 
@@ -207,7 +192,10 @@ def chat_window(analyst, llm=None):
                     # Handle MetaAI LLM
                     response = llm.prompt(message=user_question, stream=False)
                     formatted_response = format_meta_ai_response(response)
-                st.write(formatted_response)
+                if llm and llm == "meta-ai":
+                    st.markdown(f'<div style="color:white;">{formatted_response}</div>', unsafe_allow_html=True)
+                else:
+                    st.write(formatted_response)
                 st.session_state.messages.append({"role": "assistant", "response": formatted_response})
         except Exception as e:
             st.write(f"⚠️ Sorry, Couldn't generate the answer! Please try rephrasing your question. Error: {e}")
@@ -219,10 +207,8 @@ def chat_window(analyst, llm=None):
     st.sidebar.button("CLEAR 🗑️", on_click=clear_chat_history)
 
 def format_meta_ai_response(response):
-    return {
-        "message": response["message"],
-        "sources": response.get("sources", [])
-    }
+    # Split response by line and join with <br> for HTML line breaks
+    return response["message"].replace('\n', '<br>')
 
 def extract_dataframes(raw_file):
     """
@@ -249,6 +235,20 @@ def extract_dataframes(raw_file):
 
     # return the dataframes
     return dfs
+
+def openai_chat_window(df, openai_api_key):
+    column_data = df.to_string(index=False)
+
+    with st.form('openai_form'):
+        question = st.text_area('Enter your question about the data:', '')
+        submitted = st.form_submit_button('Submit')
+
+        if submitted:
+            if openai_api_key.startswith('sk-'):
+                prompt = f"Analyze the following data:\n\n{column_data}\n\n{question}"
+                generate_openai_response(prompt, openai_api_key)
+            else:
+                st.warning('Please enter a valid OpenAI API key!', icon='⚠️')
 
 if __name__ == "__main__":
     main()
