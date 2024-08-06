@@ -54,10 +54,12 @@ def main():
         data_source = st.selectbox("Select Data Source", ["SQL", "Excel"], index=0)
 
         if data_source == "SQL":
-            st.subheader("SQL Server Connection")
-            server_name = st.text_input("Server Name", "10.232.70.46")
-            database_name = st.text_input("Database Name", "Ods_live")
-            query = st.text_area("SQL Query", "Select top 10 * from EMOS.Sales_Invoiced")
+            st.subheader("Azure SQL Database Connection")
+            server_name = st.text_input("Server Name", "your_server.database.windows.net")
+            database_name = st.text_input("Database Name", "your_database")
+            username = st.text_input("Username", "")
+            password = st.text_input("Password", type='password')
+            query = st.text_area("SQL Query", "SELECT TOP 10 * FROM your_table")
 
         else:
             file_upload = st.file_uploader("Upload your Data", accept_multiple_files=False, type=['csv', 'xls', 'xlsx'])
@@ -71,12 +73,16 @@ def main():
             user_api_key = st.text_input('Please commit', placeholder='Paste your API key here', type='password')
 
     if data_source == "SQL" and server_name and database_name and query:
+        if username and password:
+            conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={server_name};DATABASE={database_name};UID={username};PWD={password};"
+        else:
+            conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={server_name};DATABASE={database_name};Trusted_Connection=yes;"
+
         try:
-            conn_str = f"DRIVER={{SQL Server}};SERVER={server_name};DATABASE={database_name};Trusted_Connection=yes;"
             conn = pyodbc.connect(conn_str)
             df = pd.read_sql_query(query, conn)
             data['SQL_Query_Result'] = df
-            st.success("Successfully fetched data from SQL Server")
+            st.success("Successfully fetched data from Azure SQL Database")
             st.dataframe(df)
 
             llm = get_LLM(llm_type, user_api_key if llm_type != 'meta-ai' else None)
@@ -93,9 +99,10 @@ def main():
                     openai_chat_window(df, user_api_key)
 
         except Exception as e:
-            st.error(f"Failed to connect to SQL Server: {e}")
+            st.error(f"Failed to connect to Azure SQL Database: {e}")
+            data_source = "Excel"  # Fallback to Excel input
 
-    elif data_source == "Excel" and file_upload is not None:
+    if data_source == "Excel" and file_upload is not None:
         data.update(extract_dataframes(file_upload))
         df = st.selectbox("Here's your uploaded data!", tuple(data.keys()), index=0)
         st.dataframe(data[df])
