@@ -7,8 +7,8 @@ try:
     # Connection string for Windows Authentication
     conn = pyodbc.connect(
         'DRIVER={ODBC Driver 17 for SQL Server};'
-        'SERVER=10.232.70.46;'
-        'DATABASE=Ods_live;'
+        'SERVER=;'
+        'DATABASE=;'
         'Trusted_Connection=yes;'
     )
     st.success("Connection Successful!")
