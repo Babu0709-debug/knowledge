@@ -4,7 +4,7 @@ import pyodbc
 # Define connection parameters
 server = '10.232.70.46'
 database = 'ODS_live'
-conn_str = f"DRIVER={{SQL Server}};SERVER={server};DATABASE={database};Trusted_Connection=yes;"
+conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={server};DATABASE={database};Trusted_Connection=yes;"
 
 # Streamlit UI
 st.title("SQL Server Connection Test")
