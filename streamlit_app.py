@@ -57,8 +57,6 @@ def main():
             st.subheader("Azure SQL Database Connection")
             server_name = st.text_input("Server Name", "your_server.database.windows.net")
             database_name = st.text_input("Database Name", "your_database")
-            username = st.text_input("Username", "")
-            password = st.text_input("Password", type='password')
             query = st.text_area("SQL Query", "SELECT TOP 10 * FROM your_table")
 
         else:
@@ -73,10 +71,7 @@ def main():
             user_api_key = st.text_input('Please commit', placeholder='Paste your API key here', type='password')
 
     if data_source == "SQL" and server_name and database_name and query:
-        if username and password:
-            conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={server_name};DATABASE={database_name};UID={username};PWD={password};"
-        else:
-            conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={server_name};DATABASE={database_name};Trusted_Connection=yes;"
+        conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={server_name};DATABASE={database_name};Trusted_Connection=yes;"
 
         try:
             conn = pyodbc.connect(conn_str)
@@ -232,30 +227,24 @@ def extract_dataframes(raw_file):
         df = pd.read_csv(raw_file)
         dfs[csv_name] = df
 
-    elif (raw_file.name.split('.')[1] == 'xlsx') or (raw_file.name.split('.')[1] == 'xls'):
-        # Read the Excel file
+    elif (raw_file.name.split('.')[1] == 'xls' or raw_file.name.split('.')[1] == 'xlsx'):
+        excel_name = raw_file.name.split('.')[0]
         xls = pd.ExcelFile(raw_file)
+        sheetnames = xls.sheet_names
 
-        # Iterate through each sheet in the Excel file and store them into dataframes
-        for sheet_name in xls.sheet_names:
-            dfs[sheet_name] = pd.read_excel(raw_file, sheet_name=sheet_name)
+        for sheet in sheetnames:
+            dfs[f"{excel_name}_{sheet}"] = pd.read_excel(raw_file, sheet_name=sheet)
 
-    # return the dataframes
     return dfs
 
-def openai_chat_window(df, openai_api_key):
-    column_data = df.to_string(index=False)
+def openai_chat_window(df, api_key):
+    input_text = st.text_area("Enter your prompt:")
 
-    with st.form('openai_form'):
-        question = st.text_area('Enter your question about the data:', '')
-        submitted = st.form_submit_button('Submit')
-
-        if submitted:
-            if openai_api_key.startswith('sk-'):
-                prompt = f"Analyze the following data:\n\n{column_data}\n\n{question}"
-                generate_openai_response(prompt, openai_api_key)
-            else:
-                st.warning('Please enter a valid OpenAI API key!', icon='⚠️')
+    if input_text:
+        generate_openai_response(input_text, api_key)
+        if st.button("Submit"):
+            user_input = input_text
+            generate_openai_response(user_input, api_key)
 
 if __name__ == "__main__":
     main()
