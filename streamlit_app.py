@@ -4,7 +4,10 @@ import pyodbc
 # Define connection parameters
 server = '10.232.70.46'
 database = 'ODS_live'
-conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={server};DATABASE={database};Trusted_Connection=yes;"
+
+# Update with the correct driver name for your system
+driver = '{ODBC Driver 17 for SQL Server}'  # Change this to the exact driver name if necessary
+conn_str = f"DRIVER={driver};SERVER={server};DATABASE={database};Trusted_Connection=yes;"
 
 # Streamlit UI
 st.title("SQL Server Connection Test")
@@ -16,7 +19,7 @@ try:
 
     # Test the connection
     cursor = conn.cursor()
-    cursor.execute("SELECT top 10 * from Emos.Sales_invoiced")
+    cursor.execute("SELECT TOP 10 * FROM Emos.Sales_invoiced")
     rows = cursor.fetchall()
 
     # Display the results
@@ -27,5 +30,7 @@ try:
     else:
         st.write("No results found.")
 
-except Exception as e:
+except pyodbc.Error as e:
     st.error(f"Failed to connect to SQL Server: {e}")
+except Exception as e:
+    st.error(f"An unexpected error occurred: {e}")
