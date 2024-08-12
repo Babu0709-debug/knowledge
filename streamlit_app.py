@@ -57,7 +57,7 @@ def main():
             st.subheader("SQL Server Connection")
             server_name = st.text_input("Server Name", "10.232.70.46")
             database_name = st.text_input("Database Name", "Ods_live")
-            query = st.text_area("SQL Query", "SELECT TOP 10 * FROM EMOS.Sales_Invoiced")
+            query = st.text_area("SQL Query", "Select top 10 * from EMOS.Sales_Invoiced")
 
         else:
             file_upload = st.file_uploader("Upload your Data", accept_multiple_files=False, type=['csv', 'xls', 'xlsx'])
@@ -71,30 +71,29 @@ def main():
             user_api_key = st.text_input('Please commit', placeholder='Paste your API key here', type='password')
 
     if data_source == "SQL" and server_name and database_name and query:
-        if test_sql_connection(server_name, database_name):
-            try:
-                conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={server_name};DATABASE={database_name};Trusted_Connection=yes;"
-                conn = pyodbc.connect(conn_str)
-                df = pd.read_sql_query(query, conn)
-                data['SQL_Query_Result'] = df
-                st.success("Successfully fetched data from SQL Server")
-                st.dataframe(df)
+        try:
+            conn_str = f"DRIVER={{SQL Server}};SERVER={server_name};DATABASE={database_name};Trusted_Connection=yes;"
+            conn = pyodbc.connect(conn_str)
+            df = pd.read_sql_query(query, conn)
+            data['SQL_Query_Result'] = df
+            st.success("Successfully fetched data from SQL Server")
+            st.dataframe(df)
 
-                llm = get_LLM(llm_type, user_api_key if llm_type != 'meta-ai' else None)
+            llm = get_LLM(llm_type, user_api_key if llm_type != 'meta-ai' else None)
 
-                if llm:
-                    if llm_type != 'meta-ai' and llm_type != 'openai':
-                        # Instantiating PandasAI agent if not using MetaAI or OpenAI
-                        analyst = get_agent(data, llm)
-                        chat_window(analyst)
-                    elif llm_type == 'meta-ai':
-                        # Handle MetaAI directly
-                        chat_window(None, llm)
-                    elif llm_type == 'openai':
-                        openai_chat_window(df, user_api_key)
+            if llm:
+                if llm_type != 'meta-ai' and llm_type != 'openai':
+                    # Instantiating PandasAI agent if not using MetaAI or OpenAI
+                    analyst = get_agent(data, llm)
+                    chat_window(analyst)
+                elif llm_type == 'meta-ai':
+                    # Handle MetaAI directly
+                    chat_window(None, llm)
+                elif llm_type == 'openai':
+                    openai_chat_window(df, user_api_key)
 
-            except Exception as e:
-                st.error(f"Failed to execute SQL query: {e}")
+        except Exception as e:
+            st.error(f"Failed to connect to SQL Server: {e}")
 
     elif data_source == "Excel" and file_upload is not None:
         data.update(extract_dataframes(file_upload))
@@ -115,19 +114,6 @@ def main():
                 openai_chat_window(data[df], user_api_key)
     else:
         st.warning("Please provide the required inputs.")
-
-def test_sql_connection(server_name, database_name):
-    """
-    Test the connection to SQL Server to check if it is accessible.
-    """
-    try:
-        conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={server_name};DATABASE={database_name};Trusted_Connection=yes;"
-        with pyodbc.connect(conn_str, timeout=5) as conn:
-            st.info("Connection to SQL Server is successful.")
-            return True
-    except Exception as e:
-        st.error(f"Failed to connect to SQL Server: {e}")
-        return False
 
 def get_LLM(llm_type, user_api_key):
     try:
@@ -160,7 +146,11 @@ def get_LLM(llm_type, user_api_key):
 
 def get_agent(data, llm):
     """
-    Create an agent for the provided LLM.
+    The function creates an agent on the dataframes extracted from the uploaded files
+    Args: 
+        data: A Dictionary with the dataframes extracted from the uploaded data
+        llm:  LLM object based on the llm type selected
+    Output: PandasAI Agent or None
     """
     if llm:
         return Agent(list(data.values()), config={"llm": llm, "verbose": True, "response_parser": StreamlitResponse})
@@ -222,25 +212,43 @@ def format_meta_ai_response(response):
 
 def extract_dataframes(raw_file):
     """
-    Extract dataframes from uploaded file.
+    This function extracts dataframes from the uploaded file/files
+    Args: 
+        raw_file: Upload_File object
+    Processing: Based on the type of file read_csv or read_excel to extract the dataframes
+    Output: 
+        dfs:  a dictionary with the dataframes
     """
     dfs = {}
     if raw_file.name.split('.')[1] == 'csv':
-        csv_file = pd.read_csv(raw_file)
-        dfs[raw_file.name] = csv_file
-    elif raw_file.name.split('.')[1] in ['xls', 'xlsx']:
-        excel_file = pd.ExcelFile(raw_file)
-        for sheet_name in excel_file.sheet_names:
-            dfs[sheet_name] = pd.read_excel(excel_file, sheet_name=sheet_name)
+        csv_name = raw_file.name.split('.')[0]
+        df = pd.read_csv(raw_file)
+        dfs[csv_name] = df
+
+    elif (raw_file.name.split('.')[1] == 'xlsx') or (raw_file.name.split('.')[1] == 'xls'):
+        # Read the Excel file
+        xls = pd.ExcelFile(raw_file)
+
+        # Iterate through each sheet in the Excel file and store them into dataframes
+        for sheet_name in xls.sheet_names:
+            dfs[sheet_name] = pd.read_excel(raw_file, sheet_name=sheet_name)
+
+    # return the dataframes
     return dfs
 
 def openai_chat_window(df, openai_api_key):
-    if openai_api_key:
-        st.write("Using OpenAI for chat...")
-        user_prompt = st.text_input("Enter your question for OpenAI", "")
-        if user_prompt:
-            response = generate_openai_response(user_prompt, openai_api_key)
-            st.write(response)
+    column_data = df.to_string(index=False)
+
+    with st.form('openai_form'):
+        question = st.text_area('Enter your question about the data:', '')
+        submitted = st.form_submit_button('Submit')
+
+        if submitted:
+            if openai_api_key.startswith('sk-'):
+                prompt = f"Analyze the following data:\n\n{column_data}\n\n{question}"
+                generate_openai_response(prompt, openai_api_key)
+            else:
+                st.warning('Please enter a valid OpenAI API key!', icon='⚠️')
 
 if __name__ == "__main__":
     main()
