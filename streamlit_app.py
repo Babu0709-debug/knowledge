@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import pyodbc
 from langchain_google_genai import ChatGoogleGenerativeAI
 import google.generativeai as genai
 from dotenv import load_dotenv
@@ -10,7 +11,6 @@ from meta_ai_api import MetaAI
 import openai
 import os
 import tiktoken
-import pyodbc
 import warnings
 
 warnings.filterwarnings('ignore')
@@ -41,6 +41,15 @@ def generate_openai_response(input_text, openai_api_key):
     except Exception as e:
         st.error(f"An error occurred: {str(e)}")
 
+def test_sql_connection(server_name, database_name):
+    try:
+        conn_str = f"DRIVER={{SQL Server}};SERVER={server_name};DATABASE={database_name};Trusted_Connection=yes;"
+        with pyodbc.connect(conn_str, timeout=5) as conn:
+            return True
+    except Exception as e:
+        st.error(f"Failed to connect to SQL Server: {e}")
+        return False
+
 def main():
     st.set_page_config(page_title="Data Analysis with LLMs", page_icon="📊")
     st.title("Data Analysis with LLMs")
@@ -54,10 +63,10 @@ def main():
         data_source = st.selectbox("Select Data Source", ["SQL", "Excel"], index=0)
 
         if data_source == "SQL":
-            st.subheader("Local SQL Server Connection")
+            st.subheader("SQL Server Connection")
             server_name = st.text_input("Server Name", "10.232.70.46")
             database_name = st.text_input("Database Name", "Ods_live")
-            query = st.text_area("SQL Query", "SELECT TOP 10 * FROM your_table")
+            query = st.text_area("SQL Query", "SELECT TOP 10 * FROM EMOS.Sales_Invoiced")
 
         else:
             file_upload = st.file_uploader("Upload your Data", accept_multiple_files=False, type=['csv', 'xls', 'xlsx'])
@@ -71,33 +80,32 @@ def main():
             user_api_key = st.text_input('Please commit', placeholder='Paste your API key here', type='password')
 
     if data_source == "SQL" and server_name and database_name and query:
-        conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={server_name};DATABASE={database_name};Trusted_Connection=yes;"
+        if test_sql_connection(server_name, database_name):
+            try:
+                conn_str = f"DRIVER={{SQL Server}};SERVER={server_name};DATABASE={database_name};Trusted_Connection=yes;"
+                conn = pyodbc.connect(conn_str)
+                df = pd.read_sql_query(query, conn)
+                data['SQL_Query_Result'] = df
+                st.success("Successfully fetched data from SQL Server")
+                st.dataframe(df)
 
-        try:
-            conn = pyodbc.connect(conn_str)
-            df = pd.read_sql_query(query, conn)
-            data['SQL_Query_Result'] = df
-            st.success("Successfully fetched data from Local SQL Server")
-            st.dataframe(df)
+                llm = get_LLM(llm_type, user_api_key if llm_type != 'meta-ai' else None)
 
-            llm = get_LLM(llm_type, user_api_key if llm_type != 'meta-ai' else None)
+                if llm:
+                    if llm_type != 'meta-ai' and llm_type != 'openai':
+                        # Instantiating PandasAI agent if not using MetaAI or OpenAI
+                        analyst = get_agent(data, llm)
+                        chat_window(analyst)
+                    elif llm_type == 'meta-ai':
+                        # Handle MetaAI directly
+                        chat_window(None, llm)
+                    elif llm_type == 'openai':
+                        openai_chat_window(df, user_api_key)
 
-            if llm:
-                if llm_type != 'meta-ai' and llm_type != 'openai':
-                    # Instantiating PandasAI agent if not using MetaAI or OpenAI
-                    analyst = get_agent(data, llm)
-                    chat_window(analyst)
-                elif llm_type == 'meta-ai':
-                    # Handle MetaAI directly
-                    chat_window(None, llm)
-                elif llm_type == 'openai':
-                    openai_chat_window(df, user_api_key)
+            except Exception as e:
+                st.error(f"Error fetching data: {e}")
 
-        except Exception as e:
-            st.error(f"Failed to connect to Local SQL Server: {e}")
-            data_source = "Excel"  # Fallback to Excel input
-
-    if data_source == "Excel" and file_upload is not None:
+    elif data_source == "Excel" and file_upload is not None:
         data.update(extract_dataframes(file_upload))
         df = st.selectbox("Here's your uploaded data!", tuple(data.keys()), index=0)
         st.dataframe(data[df])
@@ -227,18 +235,30 @@ def extract_dataframes(raw_file):
         df = pd.read_csv(raw_file)
         dfs[csv_name] = df
 
-    else:
+    elif (raw_file.name.split('.')[1] == 'xlsx') or (raw_file.name.split('.')[1] == 'xls'):
+        # Read the Excel file
         xls = pd.ExcelFile(raw_file)
+
+        # Iterate through each sheet in the Excel file and store them into dataframes
         for sheet_name in xls.sheet_names:
-            dfs[sheet_name] = xls.parse(sheet_name)
+            dfs[sheet_name] = pd.read_excel(raw_file, sheet_name=sheet_name)
+
+    # return the dataframes
     return dfs
 
 def openai_chat_window(df, openai_api_key):
-    # Function to handle OpenAI chat window
-    input_text = st.text_area("Enter text to analyze", placeholder="Type here...")
+    column_data = df.to_string(index=False)
 
-    if st.button("Generate"):
-        generate_openai_response(input_text, openai_api_key)
+    with st.form('openai_form'):
+        question = st.text_area('Enter your question about the data:', '')
+        submitted = st.form_submit_button('Submit')
 
-if __name__ == '__main__':
+        if submitted:
+            if openai_api_key.startswith('sk-'):
+                prompt = f"Analyze the following data:\n\n{column_data}\n\n{question}"
+                generate_openai_response(prompt, openai_api_key)
+            else:
+                st.warning('Please enter a valid OpenAI API key!', icon='⚠️')
+
+if __name__ == "__main__":
     main()
