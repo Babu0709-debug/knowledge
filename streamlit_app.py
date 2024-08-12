@@ -43,8 +43,8 @@ def main():
     st.title("SQL Server Data Fetch")
 
     # Input fields for server and database
-    server_name = st.text_input("Server Name", "10.232.70.46")
-    database_name = st.text_input("Database Name", "Ods_live")
+    server_name = st.text_input("Server Name", "")
+    database_name = st.text_input("Database Name", "")
 
     # Fetch data from SQL Server
     if server_name and database_name:
