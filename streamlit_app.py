@@ -72,7 +72,7 @@ def main():
 
     if data_source == "SQL" and server_name and database_name and query:
         try:
-            conn_str = 'DRIVER={ODBC Driver 17 for SQL Server};SERVER=10.232.70.46;DATABASE=Ods_live;Trusted_Connection=yes;Connection Timeout=60;'
+            conn_str = 'DRIVER={ODBC Driver 17 for SQL Server};SERVER=10.232.70.46;DATABASE=Ods_live;Trusted_Connection=yes;Connection Timeout=160;'
 
             conn = pyodbc.connect(conn_str)
             df = pd.read_sql_query(query, conn)
