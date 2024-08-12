@@ -1,23 +1,33 @@
 import streamlit as st
-import pandas as pd
-from sqlalchemy import create_engine
+import pyodbc
 
-# Define connection parameters
-server = '10.232.70.46'
-database = 'ODS_live'
-driver = 'ODBC Driver 17 for SQL Server'  # Update this to the correct driver name
+# Initialize connection.
+# Uses st.cache_resource to only run once.
+@st.cache_resource
+def init_connection():
+    return pyodbc.connect(
+        "DRIVER={ODBC Driver 17 for SQL Server};SERVER="
+        + st.secrets["server"]
+        + ";DATABASE="
+        + st.secrets["database"]
+        + ";UID="
+        + st.secrets["username"]
+        + ";PWD="
+        + st.secrets["password"]
+    )
 
-# Create SQLAlchemy engine
-engine = create_engine(f'mssql+pyodbc://{server}/{database}?driver={driver}')
+conn = init_connection()
 
-# Streamlit UI
-st.title("SQL Server Connection Test")
+# Perform query.
+# Uses st.cache_data to only rerun when the query changes or after 10 min.
+@st.cache_data(ttl=600)
+def run_query(query):
+    with conn.cursor() as cur:
+        cur.execute(query)
+        return cur.fetchall()
 
-try:
-    # Establish connection and execute query
-    query = "SELECT TOP 10 * FROM Emos.Sales_invoiced"
-    df = pd.read_sql(query, engine)
-    st.write("Query result:")
-    st.write(df)
-except Exception as e:
-    st.error(f"Failed to connect to SQL Server: {e}")
+rows = run_query("SELECT * from mytable;")
+
+# Print results.
+for row in rows:
+    st.write(f"{row[0]} has a :{row[1]}:")
