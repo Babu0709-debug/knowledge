@@ -54,9 +54,9 @@ def main():
         data_source = st.selectbox("Select Data Source", ["SQL", "Excel"], index=0)
 
         if data_source == "SQL":
-            st.subheader("Azure SQL Database Connection")
-            server_name = st.text_input("Server Name", "your_server.database.windows.net")
-            database_name = st.text_input("Database Name", "your_database")
+            st.subheader("Local SQL Server Connection")
+            server_name = st.text_input("Server Name", "10.232.70.46")
+            database_name = st.text_input("Database Name", "Ods_live")
             query = st.text_area("SQL Query", "SELECT TOP 10 * FROM your_table")
 
         else:
@@ -77,7 +77,7 @@ def main():
             conn = pyodbc.connect(conn_str)
             df = pd.read_sql_query(query, conn)
             data['SQL_Query_Result'] = df
-            st.success("Successfully fetched data from Azure SQL Database")
+            st.success("Successfully fetched data from Local SQL Server")
             st.dataframe(df)
 
             llm = get_LLM(llm_type, user_api_key if llm_type != 'meta-ai' else None)
@@ -94,7 +94,7 @@ def main():
                     openai_chat_window(df, user_api_key)
 
         except Exception as e:
-            st.error(f"Failed to connect to Azure SQL Database: {e}")
+            st.error(f"Failed to connect to Local SQL Server: {e}")
             data_source = "Excel"  # Fallback to Excel input
 
     if data_source == "Excel" and file_upload is not None:
@@ -227,24 +227,18 @@ def extract_dataframes(raw_file):
         df = pd.read_csv(raw_file)
         dfs[csv_name] = df
 
-    elif (raw_file.name.split('.')[1] == 'xls' or raw_file.name.split('.')[1] == 'xlsx'):
-        excel_name = raw_file.name.split('.')[0]
+    else:
         xls = pd.ExcelFile(raw_file)
-        sheetnames = xls.sheet_names
-
-        for sheet in sheetnames:
-            dfs[f"{excel_name}_{sheet}"] = pd.read_excel(raw_file, sheet_name=sheet)
-
+        for sheet_name in xls.sheet_names:
+            dfs[sheet_name] = xls.parse(sheet_name)
     return dfs
 
-def openai_chat_window(df, api_key):
-    input_text = st.text_area("Enter your prompt:")
+def openai_chat_window(df, openai_api_key):
+    # Function to handle OpenAI chat window
+    input_text = st.text_area("Enter text to analyze", placeholder="Type here...")
 
-    if input_text:
-        generate_openai_response(input_text, api_key)
-        if st.button("Submit"):
-            user_input = input_text
-            generate_openai_response(user_input, api_key)
+    if st.button("Generate"):
+        generate_openai_response(input_text, openai_api_key)
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
