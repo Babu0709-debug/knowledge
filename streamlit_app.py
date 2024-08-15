@@ -72,8 +72,14 @@ def main():
 
     if data_source == "SQL" and server_name and database_name and query:
         try:
-            conn_str = ('DRIVER={ODBC Driver 17 for SQL Server};''SERVER=10.232.70.46;''DATABASE=ODS_live;' 'Trusted_Connection=yes;''Connection Timeout=60;''Encrypt=yes;'
-
+            conn_str = (
+                'DRIVER={ODBC Driver 17 for SQL Server};'
+                f'SERVER={server_name};'
+                f'DATABASE={database_name};'
+                'Trusted_Connection=yes;'
+                'Connection Timeout=60;'
+                'Encrypt=yes;'
+            )
 
             conn = pyodbc.connect(conn_str)
             df = pd.read_sql_query(query, conn)
@@ -233,17 +239,21 @@ def extract_dataframes(raw_file):
 
 def openai_chat_window(df, openai_api_key):
     column_data = df.to_string(index=False)
+    st.write("Here is your data")
+    st.dataframe(df)
+    user_question = st.text_input("Please ask questions about your data here!")
 
-    with st.form('openai_form'):
-        question = st.text_area('Enter your question about the data:', '')
-        submitted = st.form_submit_button('Submit')
+    if user_question:
+        with st.chat_message("user"):
+            st.markdown(user_question)
+        st.session_state.messages.append({"role": "user", "question": user_question})
 
-        if submitted:
-            if openai_api_key.startswith('sk-'):
-                prompt = f"Analyze the following data:\n\n{column_data}\n\n{question}"
-                generate_openai_response(prompt, openai_api_key)
-            else:
-                st.warning('Please enter a valid OpenAI API key!', icon='⚠️')
+        try:
+            with st.spinner("Analyzing..."):
+                input_text = f"Here is the dataframe data:\n{column_data}\n\nUser's Question: {user_question}"
+                generate_openai_response(input_text, openai_api_key)
+        except Exception as e:
+            st.write(f"⚠️ Sorry, Couldn't generate the answer! Please try rephrasing your question. Error: {e}")
 
 if __name__ == "__main__":
     main()
