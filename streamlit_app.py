@@ -57,7 +57,7 @@ def main():
             st.subheader("SQL Server Connection")
             server_name = st.text_input("Server Name", "")
             database_name = st.text_input("Database Name", "")
-            query = st.text_area("SQL Query", "SELECT TOP 10 * FROM sys.tables")
+            query = st.text_area("SQL Query", "SELECT 1")
 
         else:
             file_upload = st.file_uploader("Upload your Data", accept_multiple_files=False, type=['csv', 'xls', 'xlsx'])
