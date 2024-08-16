@@ -73,11 +73,11 @@ def main():
     if data_source == "SQL" and server_name and database_name and query:
         try:
             conn_str = (
-                'DRIVER={ODBC Driver 17 for SQL Server};'
+                'DRIVER={SQL Server};'
                 f'SERVER={server_name};'
                 f'DATABASE={database_name};'
                 'Trusted_Connection=yes;'
-                'Connection Timeout=60;'
+                'Connection Timeout=0;'
                 'Encrypt=yes;'
             )
 
