@@ -35,3 +35,4 @@ tiktoken
 langchain
 meta_ai_api
 pyodbc
+mysql-connector-python
