@@ -57,7 +57,6 @@ def main():
         if data_source in ["SQL Server", "MySQL"]:
             st.subheader(f"{data_source} Connection")
 
-            # Choose the SQL Server or MySQL
             if data_source == "SQL Server":
                 server_name = st.text_input("Server Name", "")
                 database_name = st.text_input("Database Name", "")
@@ -78,7 +77,8 @@ def main():
         llm_type = st.selectbox("Please select LLM", ('BambooLLM', 'gemini-pro', 'meta-ai', 'openai'), index=0)
 
         # Adding user's API Key
-        if llm_type != 'meta-ai':
+        user_api_key = None
+        if llm_type in ['BambooLLM', 'gemini-pro', 'openai']:
             user_api_key = st.text_input('Please commit', placeholder='Paste your API key here', type='password')
 
     # Handling SQL Server Connection
@@ -136,7 +136,7 @@ def handle_llm_selection(llm_type, user_api_key, df):
     llm = get_LLM(llm_type, user_api_key if llm_type != 'meta-ai' else None)
 
     if llm:
-        if llm_type != 'meta-ai' and llm_type != 'openai':
+        if llm_type not in ['meta-ai', 'openai']:
             # Instantiating PandasAI agent if not using MetaAI or OpenAI
             analyst = get_agent(data, llm)
             chat_window(analyst)
@@ -144,7 +144,10 @@ def handle_llm_selection(llm_type, user_api_key, df):
             # Handle MetaAI directly
             chat_window(None, llm)
         elif llm_type == 'openai':
-            openai_chat_window(df, user_api_key)
+            if user_api_key:
+                openai_chat_window(df, user_api_key)
+            else:
+                st.warning("Please enter OpenAI API key")
 
 def get_LLM(llm_type, user_api_key):
     try:
@@ -241,35 +244,18 @@ def format_meta_ai_response(response):
 def extract_dataframes(uploaded_file):
     """
     Handles the uploaded Excel/CSV files and extract dataframes.
-    Args: 
-        uploaded_file: Uploaded Excel or CSV file.
+    Args:
+        uploaded_file: The uploaded file object.
     Returns:
-        Dictionary of extracted dataframes
+        Dictionary of dataframes.
     """
-    data = {}
-    try:
-        if uploaded_file.name.split(".")[-1] in ["xls", "xlsx"]:
-            xl = pd.ExcelFile(uploaded_file)
-            for sheet in xl.sheet_names:
-                data[sheet] = xl.parse(sheet)
-        elif uploaded_file.name.split(".")[-1] == "csv":
-            data["CSV Data"] = pd.read_csv(uploaded_file)
-        st.success("Data successfully extracted!")
-        return data
-    except Exception as e:
-        st.error(f"Error extracting data: {e}")
-
-def openai_chat_window(df, openai_api_key):
-    # Example OpenAI prompt section
-    st.header("OpenAI Chat Window")
-    st.dataframe(df)
-    input_text = st.text_area("Describe the data analysis you want OpenAI to perform:")
-
-    if st.button("Submit to OpenAI"):
-        if input_text and openai_api_key:
-            generate_openai_response(input_text, openai_api_key)
-        else:
-            st.warning("Please enter text and OpenAI API key")
+    if uploaded_file.type == "text/csv":
+        return {'data': pd.read_csv(uploaded_file)}
+    elif uploaded_file.type in ["application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"]:
+        return {'data': pd.read_excel(uploaded_file)}
+    else:
+        st.error("Unsupported file format. Please upload a CSV or Excel file.")
+        return {}
 
 if __name__ == "__main__":
     main()
