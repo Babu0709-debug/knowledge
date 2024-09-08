@@ -235,15 +235,56 @@ def chat_window(analyst, llm=None):
         st.session_state.messages = []
 
     st.sidebar.text("Click to Clear Chat history")
-    st.sidebar.button("CLEAR 🗑️", on_click=clear_chat_history)
+    st.sidebar.button("Clear Chat", on_click=clear_chat_history)
 
 def format_meta_ai_response(response):
-    # Format MetaAI response with HTML line breaks
-    return response["message"].replace('\n', '<br>')
+    """
+    Formats the response from MetaAI to display it correctly.
+    Args:
+        response: The response object from MetaAI API.
+    Returns:
+        Formatted response text.
+    """
+    if response and hasattr(response, 'get'):
+        return response.get('text', 'No response text found.')
+    return 'No response text found.'
+
+def openai_chat_window(df, user_api_key):
+    try:
+        openai.api_key = user_api_key
+        chat_window = st.empty()
+        for message in st.session_state.messages:
+            with chat_window:
+                if 'question' in message:
+                    st.markdown(message["question"])
+                elif 'response' in message:
+                    st.write(message["response"])
+
+        user_question = st.text_input("Enter your question here")
+
+        if user_question:
+            with chat_window:
+                st.markdown(user_question)
+            st.session_state.messages.append({"role": "user", "question": user_question})
+
+            try:
+                response = openai.Completion.create(
+                    engine="text-davinci-003",
+                    prompt=user_question,
+                    max_tokens=150
+                )
+                formatted_response = response.choices[0].text.strip()
+                st.write(formatted_response)
+                st.session_state.messages.append({"role": "assistant", "response": formatted_response})
+            except Exception as e:
+                st.write(f"⚠️ Sorry, Couldn't generate the answer! Please try rephrasing your question. Error: {e}")
+
+    except Exception as e:
+        st.error(f"Error with OpenAI API: {e}")
 
 def extract_dataframes(uploaded_file):
     """
-    Handles the uploaded Excel/CSV files and extract dataframes.
+    Extracts dataframes from the uploaded file based on file type.
     Args:
         uploaded_file: The uploaded file object.
     Returns:
