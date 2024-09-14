@@ -23,12 +23,17 @@ if st.button('Execute Query'):
     
     try:
         # Establish connection
-        conn = pyodbc.connect(conn_str)
+        st.info('Connecting to SQL Server...')
+        conn = pyodbc.connect(conn_str, timeout=10)  # Set a connection timeout
         # Execute query and load data into DataFrame
         df = pd.read_sql(query, conn)
         conn.close()
         
         # Display the DataFrame
         st.write(df)
+    except pyodbc.OperationalError as e:
+        st.error(f"Operational Error: {e}")
     except pyodbc.Error as e:
         st.error(f"Error: {e}")
+    except Exception as e:
+        st.error(f"An unexpected error occurred: {e}")
