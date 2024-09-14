@@ -24,7 +24,7 @@ if st.button('Execute Query'):
     try:
         # Establish connection
         st.info('Connecting to SQL Server...')
-        conn = pyodbc.connect(conn_str, timeout=10)  # Set a connection timeout
+        conn = pyodbc.connect(conn_str, timeout=30)  # Set a connection timeout
         # Execute query and load data into DataFrame
         df = pd.read_sql(query, conn)
         conn.close()
