@@ -15,7 +15,7 @@ if st.button('Load Data'):
             database=database_name
         )
 
-        query = "SELECT * FROM your_table"  # Modify with your table name
+        query = "SELECT 1"  # Modify with your table name
         df = pd.read_sql(query, conn)
         conn.close()
 
