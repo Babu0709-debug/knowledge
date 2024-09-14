@@ -37,3 +37,4 @@ meta_ai_api
 pyodbc
 mysql.connector
 pydantic
+pymssql
