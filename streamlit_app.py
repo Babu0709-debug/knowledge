@@ -3,8 +3,8 @@ import pyodbc
 import pandas as pd
 
 # Define connection parameters
-server_name = 'sestosql05.eu.esab.org'
-database_name = 'ODS_live'
+server_name = ''
+database_name = ''
 
 # Streamlit app layout
 st.title('SQL Server Data Viewer')
