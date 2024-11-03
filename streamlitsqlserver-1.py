@@ -14,7 +14,6 @@ import pyodbc
 import mysql.connector
 import warnings
 
-
 st.set_page_config(page_title="Data Analysis with LLMs", page_icon="📊")
 drivers = pyodbc.drivers()
 st.write("Available ODBC Drivers:", drivers)
@@ -47,7 +46,6 @@ def generate_openai_response(input_text, openai_api_key):
         st.error(f"An error occurred: {str(e)}")
 
 def main():
-   
     st.title("Data Analysis with LLMs")
 
     # Side Menu Bar
@@ -179,14 +177,6 @@ def get_LLM(llm_type, user_api_key):
         st.error(f"Error in getting LLM: {e}")
 
 def get_agent(data, llm):
-    """
-    Creates an agent for the dataframes extracted from the uploaded files.
-    Args: 
-        data: A dictionary with the dataframes extracted from the uploaded data.
-        llm:  LLM object based on the selected llm type.
-    Returns:
-        PandasAI Agent or None
-    """
     if llm:
         return Agent(list(data.values()), config={"llm": llm, "verbose": True, "response_parser": StreamlitResponse})
     return None
@@ -239,17 +229,9 @@ def chat_window(analyst, llm=None):
     st.sidebar.button("CLEAR 🗑️", on_click=clear_chat_history)
 
 def format_meta_ai_response(response):
-    # Format MetaAI response with HTML line breaks
     return response["message"].replace('\n', '<br>')
 
 def extract_dataframes(uploaded_file):
-    """
-    Handles the uploaded Excel/CSV files and extract dataframes.
-    Args: 
-        uploaded_file: Uploaded Excel or CSV file.
-    Returns:
-        Dictionary of extracted dataframes
-    """
     data = {}
     try:
         if uploaded_file.name.split(".")[-1] in ["xls", "xlsx"]:
@@ -261,19 +243,8 @@ def extract_dataframes(uploaded_file):
         st.success("Data successfully extracted!")
         return data
     except Exception as e:
-        st.error(f"Error extracting data: {e}")
+        st.error(f"Could not read file. Error: {str(e)}")
+        return {}
 
-def openai_chat_window(df, openai_api_key):
-    # Example OpenAI prompt section
-    st.header("OpenAI Chat Window")
-    st.dataframe(df)
-    input_text = st.text_area("Describe the data analysis you want OpenAI to perform:")
-
-    if st.button("Submit to OpenAI"):
-        if input_text and openai_api_key:
-            generate_openai_response(input_text, openai_api_key)
-        else:
-            st.warning("Please enter text and OpenAI API key")
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
