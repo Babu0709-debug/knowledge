@@ -14,6 +14,8 @@ import pyodbc
 import mysql.connector
 import warnings
 
+
+st.set_page_config(page_title="Data Analysis with LLMs", page_icon="📊")
 drivers = pyodbc.drivers()
 st.write("Available ODBC Drivers:", drivers)
 warnings.filterwarnings('ignore')
@@ -45,7 +47,7 @@ def generate_openai_response(input_text, openai_api_key):
         st.error(f"An error occurred: {str(e)}")
 
 def main():
-    st.set_page_config(page_title="Data Analysis with LLMs", page_icon="📊")
+   
     st.title("Data Analysis with LLMs")
 
     # Side Menu Bar
