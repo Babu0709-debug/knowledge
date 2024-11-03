@@ -13,7 +13,7 @@ import tiktoken
 import pyodbc
 import mysql.connector
 import warnings
-import pyodbc
+
 drivers = pyodbc.drivers()
 st.write("Available ODBC Drivers:", drivers)
 warnings.filterwarnings('ignore')
