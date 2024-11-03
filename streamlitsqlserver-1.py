@@ -13,7 +13,9 @@ import tiktoken
 import pyodbc
 import mysql.connector
 import warnings
-
+import pyodbc
+drivers = pyodbc.drivers()
+st.write("Available ODBC Drivers:", drivers)
 warnings.filterwarnings('ignore')
 
 # Load environment variables
@@ -89,7 +91,7 @@ def main():
                 f'SERVER={server_name};'
                 f'DATABASE={database_name};'
                 'Trusted_Connection=yes;'
-                'Connection Timeout=0;'
+                'Connection Timeout=30;'
                 'Encrypt=yes;'
             )
             conn = pyodbc.connect(conn_str)
