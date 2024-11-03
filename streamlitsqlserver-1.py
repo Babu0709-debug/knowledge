@@ -11,8 +11,12 @@ import openai
 import os
 import tiktoken
 import pyodbc
+import mysql.connector
 import warnings
-
+from sqlalchemy import create_engine
+st.set_page_config(page_title="Data Analysis with LLMs", page_icon="📊")
+drivers = pyodbc.drivers()
+st.write("Available ODBC Drivers:", drivers)
 warnings.filterwarnings('ignore')
 
 # Load environment variables
@@ -42,8 +46,7 @@ def generate_openai_response(input_text, openai_api_key):
         st.error(f"An error occurred: {str(e)}")
 
 def main():
-    st.set_page_config(page_title="Data Analysis with Babu", page_icon="📊")
-    st.title("Data Analysis with Babu")
+    st.title("Data Analysis with LLMs")
 
     # Side Menu Bar
     with st.sidebar:
@@ -51,13 +54,23 @@ def main():
         st.text("Data Setup: 📝")
 
         # Selection Dropdown for Data Source
-        data_source = st.selectbox("Select Data Source", ["SQL", "Excel"], index=0)
+        data_source = st.selectbox("Select Data Source", ["SQL Server", "MySQL", "Excel"], index=0)
 
-        if data_source == "SQL":
-            st.subheader("SQL Server Connection")
-            server_name = st.text_input("Server Name", "10.232.70.46")
-            database_name = st.text_input("Database Name", "Ods_live")
-            query = st.text_area("SQL Query", "Select top 10 * from EMOS.Sales_Invoiced")
+        if data_source in ["SQL Server", "MySQL"]:
+            st.subheader(f"{data_source} Connection")
+
+            # Choose the SQL Server or MySQL
+            if data_source == "SQL Server":
+                server_name = st.text_input("Server Name", "")
+                database_name = st.text_input("Database Name", "")
+                query = st.text_area("SQL Query", "SELECT 1")
+
+            elif data_source == "MySQL":
+                host = st.text_input("Host", "")
+                user = st.text_input("User", "")
+                password = st.text_input("Password", type="password")
+                database_name = st.text_input("Database Name", "")
+                query = st.text_area("SQL Query", "SELECT 1")
 
         else:
             file_upload = st.file_uploader("Upload your Data", accept_multiple_files=False, type=['csv', 'xls', 'xlsx'])
@@ -70,50 +83,70 @@ def main():
         if llm_type != 'meta-ai':
             user_api_key = st.text_input('Please commit', placeholder='Paste your API key here', type='password')
 
-    if data_source == "SQL" and server_name and database_name and query:
+    # Handling SQL Server Connection
+    if data_source == "SQL Server" and server_name and database_name and query:
         try:
-            conn_str = f"DRIVER={{SQL Server}};SERVER={server_name};DATABASE={database_name};Trusted_Connection=yes;"
+            conn_str = (
+                'DRIVER={SQL Server};'
+                f'SERVER={server_name};'
+                f'DATABASE={database_name};'
+                'Trusted_Connection=yes;'
+                'Connection Timeout=30;'
+                'Encrypt=yes;'
+            )
             conn = pyodbc.connect(conn_str)
             df = pd.read_sql_query(query, conn)
             data['SQL_Query_Result'] = df
             st.success("Successfully fetched data from SQL Server")
             st.dataframe(df)
 
-            llm = get_LLM(llm_type, user_api_key if llm_type != 'meta-ai' else None)
-
-            if llm:
-                if llm_type != 'meta-ai' and llm_type != 'openai':
-                    # Instantiating PandasAI agent if not using MetaAI or OpenAI
-                    analyst = get_agent(data, llm)
-                    chat_window(analyst)
-                elif llm_type == 'meta-ai':
-                    # Handle MetaAI directly
-                    chat_window(None, llm)
-                elif llm_type == 'openai':
-                    openai_chat_window(df, user_api_key)
+            handle_llm_selection(llm_type, user_api_key, df)
 
         except Exception as e:
             st.error(f"Failed to connect to SQL Server: {e}")
+
+    # Handling MySQL Connection
+    elif data_source == "MySQL" and host and user and password and database_name and query:
+        try:
+            conn = mysql.connector.connect(
+                host=host,
+                user=user,
+                password=password,
+                database=database_name
+            )
+            df = pd.read_sql_query(query, conn)
+            data['MySQL_Query_Result'] = df
+            st.success("Successfully fetched data from MySQL")
+            st.dataframe(df)
+
+            handle_llm_selection(llm_type, user_api_key, df)
+
+        except Exception as e:
+            st.error(f"Failed to connect to MySQL: {e}")
 
     elif data_source == "Excel" and file_upload is not None:
         data.update(extract_dataframes(file_upload))
         df = st.selectbox("Here's your uploaded data!", tuple(data.keys()), index=0)
         st.dataframe(data[df])
 
-        llm = get_LLM(llm_type, user_api_key if llm_type != 'meta-ai' else None)
+        handle_llm_selection(llm_type, user_api_key, data[df])
 
-        if llm:
-            if llm_type != 'meta-ai' and llm_type != 'openai':
-                # Instantiating PandasAI agent if not using MetaAI or OpenAI
-                analyst = get_agent(data, llm)
-                chat_window(analyst)
-            elif llm_type == 'meta-ai':
-                # Handle MetaAI directly
-                chat_window(None, llm)
-            elif llm_type == 'openai':
-                openai_chat_window(data[df], user_api_key)
     else:
         st.warning("Please provide the required inputs.")
+
+def handle_llm_selection(llm_type, user_api_key, df):
+    llm = get_LLM(llm_type, user_api_key if llm_type != 'meta-ai' else None)
+
+    if llm:
+        if llm_type != 'meta-ai' and llm_type != 'openai':
+            # Instantiating PandasAI agent if not using MetaAI or OpenAI
+            analyst = get_agent(data, llm)
+            chat_window(analyst)
+        elif llm_type == 'meta-ai':
+            # Handle MetaAI directly
+            chat_window(None, llm)
+        elif llm_type == 'openai':
+            openai_chat_window(df, user_api_key)
 
 def get_LLM(llm_type, user_api_key):
     try:
@@ -137,7 +170,6 @@ def get_LLM(llm_type, user_api_key):
             llm = MetaAI()  # Meta AI does not require an API key
 
         elif llm_type == 'openai':
-            # For OpenAI, no need to instantiate the class as it is handled in the generate_openai_response function
             llm = "openai"
 
         return llm
@@ -145,21 +177,11 @@ def get_LLM(llm_type, user_api_key):
         st.error(f"Error in getting LLM: {e}")
 
 def get_agent(data, llm):
-    """
-    The function creates an agent on the dataframes extracted from the uploaded files
-    Args: 
-        data: A Dictionary with the dataframes extracted from the uploaded data
-        llm:  LLM object based on the llm type selected
-    Output: PandasAI Agent or None
-    """
     if llm:
         return Agent(list(data.values()), config={"llm": llm, "verbose": True, "response_parser": StreamlitResponse})
     return None
 
 def chat_window(analyst, llm=None):
-    with st.chat_message("assistant"):
-        st.text("Explore Babu's Data")
-
     if "messages" not in st.session_state:
         st.session_state.messages = []
 
@@ -207,48 +229,22 @@ def chat_window(analyst, llm=None):
     st.sidebar.button("CLEAR 🗑️", on_click=clear_chat_history)
 
 def format_meta_ai_response(response):
-    # Split response by line and join with <br> for HTML line breaks
     return response["message"].replace('\n', '<br>')
 
-def extract_dataframes(raw_file):
-    """
-    This function extracts dataframes from the uploaded file/files
-    Args: 
-        raw_file: Upload_File object
-    Processing: Based on the type of file read_csv or read_excel to extract the dataframes
-    Output: 
-        dfs:  a dictionary with the dataframes
-    """
-    dfs = {}
-    if raw_file.name.split('.')[1] == 'csv':
-        csv_name = raw_file.name.split('.')[0]
-        df = pd.read_csv(raw_file)
-        dfs[csv_name] = df
+def extract_dataframes(uploaded_file):
+    data = {}
+    try:
+        if uploaded_file.name.split(".")[-1] in ["xls", "xlsx"]:
+            xl = pd.ExcelFile(uploaded_file)
+            for sheet in xl.sheet_names:
+                data[sheet] = xl.parse(sheet)
+        elif uploaded_file.name.split(".")[-1] == "csv":
+            data["CSV Data"] = pd.read_csv(uploaded_file)
+        st.success("Data successfully extracted!")
+        return data
+    except Exception as e:
+        st.error(f"Could not read file. Error: {str(e)}")
+        return {}
 
-    elif (raw_file.name.split('.')[1] == 'xlsx') or (raw_file.name.split('.')[1] == 'xls'):
-        # Read the Excel file
-        xls = pd.ExcelFile(raw_file)
-
-        # Iterate through each sheet in the Excel file and store them into dataframes
-        for sheet_name in xls.sheet_names:
-            dfs[sheet_name] = pd.read_excel(raw_file, sheet_name=sheet_name)
-
-    # return the dataframes
-    return dfs
-
-def openai_chat_window(df, openai_api_key):
-    column_data = df.to_string(index=False)
-
-    with st.form('openai_form'):
-        question = st.text_area('Enter your question about the data:', '')
-        submitted = st.form_submit_button('Submit')
-
-        if submitted:
-            if openai_api_key.startswith('sk-'):
-                prompt = f"Analyze the following data:\n\n{column_data}\n\n{question}"
-                generate_openai_response(prompt, openai_api_key)
-            else:
-                st.warning('Please enter a valid OpenAI API key!', icon='⚠️')
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
