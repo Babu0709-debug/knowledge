@@ -55,6 +55,8 @@ def main():
 
         if data_source == "SQL":
             st.subheader("SQL Server Connection")
+            username = st.text_input("celonis_dbread")
+            password = st.text_input("Password", type="AuT@tRc(M3)!")
             server_name = st.text_input("Server Name", "10.232.70.46")
             database_name = st.text_input("Database Name", "Ods_live")
             query = st.text_area("SQL Query", "Select top 10 * from EMOS.Sales_Invoiced")
@@ -72,7 +74,7 @@ def main():
 
     if data_source == "SQL" and server_name and database_name and query:
         try:
-            conn_str = f"DRIVER={{SQL Server}};SERVER={server_name};DATABASE={database_name};Trusted_Connection=yes;"
+            conn_str = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={server_name};DATABASE={database_name};UID={username};PWD={password};"
             conn = pyodbc.connect(conn_str)
             df = pd.read_sql_query(query, conn)
             data['SQL_Query_Result'] = df
