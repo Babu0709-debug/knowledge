@@ -33,3 +33,4 @@ pyodbc
 mysql-connector-python
 pydantic
 pymssql
+huggingface_hub
